@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AnalyzerLOG — Аналіз польотних логів БпЛА</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --bg2: #111318;
+    --bg3: #1a1d24;
+    --accent: #00d4aa;
+    --accent2: #0099ff;
+    --warn: #ff6b35;
+    --danger: #ff3355;
+    --text: #c8cdd6;
+    --text-dim: #6b7280;
+    --border: #2a2f3a;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 15px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px; flex-shrink: 0;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; color: #fff; line-height: 1.2; }
+  .header p { font-size: 11px; color: var(--text-dim); }
+
+  /* ── CONTAINER ── */
+  .container { max-width: 1360px; margin: 0 auto; padding: 20px 16px; }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 36px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    background: var(--bg2);
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,212,170,.05);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon { font-size: 40px; margin-bottom: 10px; }
+  .upload-zone h2 { font-size: 16px; color: #fff; margin-bottom: 6px; }
+  .upload-zone p { color: var(--text-dim); font-size: 12px; }
+
+  /* ── FILE INFO ── */
+  .file-info {
+    display: none;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-top: 14px;
+    align-items: center;
+    gap: 12px;
+  }
+  .file-info.visible { display: flex; }
+  .file-icon { font-size: 26px; flex-shrink: 0; }
+  .file-details h3 { color: #fff; font-size: 14px; word-break: break-all; }
+  .file-details p { color: var(--text-dim); font-size: 12px; }
+
+  /* ── MISSION TYPE BUTTONS ── */
+  .mission-row {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mission-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-weight: 600;
+  }
+  .mission-btns {
+    display: flex;
+    gap: 10px;
+  }
+  .mission-btn {
+    flex: 1;
+    padding: 13px 10px;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    background: var(--bg3);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+    letter-spacing: .3px;
+  }
+  .mission-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .mission-btn.selected-loss {
+    border-color: var(--danger);
+    background: rgba(255,51,85,.1);
+    color: var(--danger);
+  }
+  .mission-btn.selected-damage {
+    border-color: var(--warn);
+    background: rgba(255,107,53,.1);
+    color: var(--warn);
+  }
+
+  /* ── ANALYZE BUTTON ── */
+  .analyze-row {
+    margin-top: 14px;
+    display: flex;
+    gap: 10px;
+  }
+  .btn {
+    padding: 12px 22px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    transition: all .2s;
+    font-family: inherit;
+  }
+  .btn-primary {
+    flex: 1;
+    background: linear-gradient(135deg, var(--accent), #009977);
+    color: #000;
+  }
+  .btn-primary:hover:not(:disabled) { opacity: .88; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: var(--bg3);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 12px 18px;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── ERROR ── */
+  .error-box {
+    display: none;
+    background: rgba(255,51,85,.08);
+    border: 1px solid rgba(255,51,85,.3);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-top: 14px;
+    color: var(--danger);
+    font-size: 13px;
+  }
+  .error-box.visible { display: block; }
+
+  /* ── LOADER ── */
+  .loader { display: none; text-align: center; padding: 40px 20px; }
+  .loader.visible { display: block; }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader p { color: var(--text-dim); font-size: 13px; }
+
+  /* ── RESULTS ── */
+  #results { display: none; }
+  #results.visible { display: block; }
+
+  /* ── MESSENGER BLOCK ── */
+  .messenger-block {
+    background: linear-gradient(135deg, rgba(0,212,170,.07), rgba(0,153,255,.04));
+    border: 1px solid rgba(0,212,170,.25);
+    border-radius: var(--radius);
+    padding: 18px 18px 18px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .messenger-block .tag {
+    display: inline-block;
+    background: var(--accent);
+    color: #000;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .messenger-text {
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.75;
+    color: #e2e8f0;
+    padding-right: 80px;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: rgba(0,212,170,.12);
+    border: 1px solid rgba(0,212,170,.25);
+    color: var(--accent);
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    transition: all .2s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .copy-btn:hover { background: rgba(0,212,170,.22); }
+  .copy-btn.copied { background: var(--green); color: #000; border-color: var(--green); }
+
+  /* ── STATS GRID ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+  .stat-card .val {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1.2;
+    word-break: break-word;
+  }
+  .stat-card .val.warn { color: var(--warn); }
+  .stat-card .val.danger { color: var(--danger); }
+  .stat-card .val.ok { color: var(--green); }
+  .stat-card .lbl { font-size: 11px; color: var(--text-dim); margin-top: 5px; line-height: 1.3; }
+
+  /* ── SECTION ── */
+  .section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .section-header h2 { font-size: 14px; font-weight: 700; color: #fff; }
+  .section-header .icon { font-size: 16px; }
+  .section-header .chevron { margin-left: auto; color: var(--text-dim); transition: transform .2s; }
+  .section-header.collapsed .chevron { transform: rotate(-90deg); }
+  .section-body { padding: 18px; }
+  .section-body.hidden { display: none; }
+
+  /* ── CHARTS GRID ── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .chart-wrap {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px 4px 4px;
+    overflow: hidden;
+  }
+  .chart-title {
+    padding: 10px 14px 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+  .chart-full { grid-column: 1 / -1; }
+
+  /* ── EVENTS TABLE ── */
+  .events-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .events-table th {
+    background: var(--bg3);
+    color: var(--text-dim);
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .events-table td { padding: 8px 12px; border-bottom: 1px solid rgba(42,47,58,.5); vertical-align: top; }
+  .events-table tr:last-child td { border-bottom: none; }
+  .t-cell { color: var(--accent2); font-family: monospace; white-space: nowrap; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .badge-reb { background: rgba(255,107,53,.15); color: var(--warn); border: 1px solid rgba(255,107,53,.3); }
+  .badge-spoof { background: rgba(255,51,85,.15); color: var(--danger); border: 1px solid rgba(255,51,85,.3); }
+  .badge-atti { background: rgba(0,153,255,.15); color: var(--accent2); border: 1px solid rgba(0,153,255,.3); }
+  .badge-ok { background: rgba(34,197,94,.1); color: var(--green); border: 1px solid rgba(34,197,94,.2); }
+
+  /* ── REPORT TEXT ── */
+  .report-text {
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--text);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    tab-size: 4;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── TABLE RESPONSIVE ── */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* ── MOBILE ── */
+  @media (max-width: 700px) {
+    html { font-size: 14px; }
+    .container { padding: 12px 10px; }
+    .upload-zone { padding: 24px 16px; }
+    .upload-icon { font-size: 32px; }
+    .upload-zone h2 { font-size: 15px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-card .val { font-size: 18px; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .chart-full { grid-column: 1; }
+    .messenger-text { padding-right: 0; padding-bottom: 44px; }
+    .copy-btn { top: auto; bottom: 12px; right: 14px; }
+    .mission-btns { flex-direction: column; }
+    .analyze-row { flex-direction: column; }
+    .btn { width: 100%; }
+    .events-table th:nth-child(2),
+    .events-table td:nth-child(2) { display: none; }
+    .section-body { padding: 12px; }
+    .section-header { padding: 12px 14px; }
+    .report-text { font-size: 13px; }
+  }
+  @media (max-width: 420px) {
+    .header h1 { font-size: 16px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .stat-card .val { font-size: 16px; }
+    .stat-card .lbl { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">🛰</div>
+  <div>
+    <h1>AnalyzerLOG</h1>
+    <p>Аналіз польотних логів БпЛА · DJI Airdata CSV</p>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- UPLOAD -->
+  <div class="upload-zone" id="dropzone">
+    <input type="file" id="fileInput" accept=".csv">
+    <div class="upload-icon">📂</div>
+    <h2>Перетягніть CSV-файл або натисніть для вибору</h2>
+    <p>Формат DJI Airdata — розділювач «;»</p>
+  </div>
+
+  <div class="file-info" id="fileInfo">
+    <div class="file-icon">📋</div>
+    <div class="file-details">
+      <h3 id="fileName">—</h3>
+      <p id="fileSize">—</p>
+    </div>
+  </div>
+
+  <!-- MISSION TYPE -->
+  <div class="mission-row">
+    <div class="mission-label">Оберіть тип місії</div>
+    <div class="mission-btns">
+      <button class="mission-btn" id="btnLoss" onclick="selectMission('ВТРАТА')">
+        ⚠️&nbsp; ВТРАТА
+      </button>
+      <button class="mission-btn" id="btnDamage" onclick="selectMission('ПОШКОДЖЕННЯ')">
+        🔧&nbsp; ПОШКОДЖЕННЯ
+      </button>
+    </div>
+  </div>
+
+  <!-- ANALYZE BUTTON -->
+  <div class="analyze-row">
+    <button class="btn btn-primary" id="analyzeBtn" disabled onclick="runAnalysis()">
+      ⚡ Аналізувати (ШІ)
+    </button>
+    <button class="btn btn-secondary" onclick="resetAll()">↩</button>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <p>Аналізую дані польоту за допомогою ШІ…</p>
+    <p style="margin-top:4px;font-size:11px">Зазвичай 15–30 секунд</p>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+
+    <!-- MESSENGER -->
+    <div class="messenger-block" style="margin-top:20px">
+      <span class="tag">📱 Текст для месенджера</span>
+      <button class="copy-btn" id="copyBtn" onclick="copyMessenger()">Копіювати</button>
+      <div class="messenger-text" id="messengerText"></div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <!-- EVENTS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="icon">⚡</span>
+        <h2>Хронологія ключових подій</h2>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="table-scroll">
+          <table class="events-table">
+            <thead><tr><th>Час (с)</th><th>UTC+2</th><th>Тип</th><th>Опис</th></tr></thead>
+            <tbody id="eventsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="icon">📈</span>
+        <h2>Графіки телеметрії</h2>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="charts-grid" id="chartsGrid">
+          <div class="chart-wrap">
+            <div class="chart-title">Висота над точкою зльоту, м</div>
+            <div id="chartHeight" style="height:240px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Горизонтальна швидкість, км/год</div>
+            <div id="chartSpeed" style="height:240px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Дистанція від точки зльоту, м</div>
+            <div id="chartDist" style="height:240px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Кількість супутників GPS</div>
+            <div id="chartSats" style="height:240px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Заряд акумулятора, %</div>
+            <div id="chartBat" style="height:240px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
+            <div id="chartAttitude" style="height:240px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Вертикальна швидкість, м/с</div>
+            <div id="chartVspeed" style="height:240px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Напруга акумулятора, В</div>
+            <div id="chartVolt" style="height:240px"></div>
+          </div>
+          <div class="chart-wrap chart-full">
+            <div class="chart-title">Режим польоту по часу</div>
+            <div id="chartState" style="height:180px"></div>
+          </div>
+          <div class="chart-wrap chart-full">
+            <div class="chart-title">Траєкторія польоту</div>
+            <div id="chartMap" style="height:380px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI REPORT -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="icon">📄</span>
+        <h2>Повний аналітичний звіт</h2>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="report-text" id="reportText"></div>
+      </div>
+    </div>
+
+  </div><!-- /results -->
+</div><!-- /container -->
+
+<script>
+// ── STATE ────────────────────────────────────────────────────────────────
+let csvText = '';
+let metrics  = {};
+let fileName = '';
+let missionType = null; // 'ВТРАТА' | 'ПОШКОДЖЕННЯ'
+
+// ── DRAG & DROP ──────────────────────────────────────────────────────────
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+
+['dragover','dragenter'].forEach(e =>
+  dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.add('drag-over'); })
+);
+['dragleave','drop'].forEach(e =>
+  dropzone.addEventListener(e, () => dropzone.classList.remove('drag-over'))
+);
+dropzone.addEventListener('drop', ev => {
+  ev.preventDefault();
+  const f = ev.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(f) {
+  fileName = f.name;
+  document.getElementById('fileName').textContent = f.name;
+  document.getElementById('fileSize').textContent = fmtSize(f.size);
+  document.getElementById('fileInfo').classList.add('visible');
+  showError('');
+  checkAnalyzeBtn();
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    csvText = e.target.result;
+    const rows = parseCSV(csvText);
+    metrics  = extractMetrics(rows);
+    const summary = buildSummary(metrics);
+
+    document.getElementById('results').classList.add('visible');
+    renderStats(summary);
+    renderEvents(metrics, summary);
+    renderCharts(metrics, summary);
+  };
+  reader.readAsText(f, 'UTF-8');
+}
+
+// ── MISSION SELECTION ────────────────────────────────────────────────────
+function selectMission(type) {
+  missionType = type;
+  document.getElementById('btnLoss').className   = 'mission-btn' + (type === 'ВТРАТА' ? ' selected-loss' : '');
+  document.getElementById('btnDamage').className = 'mission-btn' + (type === 'ПОШКОДЖЕННЯ' ? ' selected-damage' : '');
+  checkAnalyzeBtn();
+}
+
+function checkAnalyzeBtn() {
+  document.getElementById('analyzeBtn').disabled = !(csvText && missionType);
+}
+
+// ── CSV PARSER ───────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return [];
+  const headers = lines[0].split(';').map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const cols = line.split(';');
+    const row  = {};
+    headers.forEach((h, j) => { row[h] = (cols[j] || '').trim(); });
+    return row;
+  });
+}
+
+const FEET_TO_M = 0.3048, MPH_TO_MS = 0.44704, MPH_TO_KMH = 1.60934;
+
+function gv(row, ...keys) {
+  for (const k of keys) {
+    if (k in row) { const v = parseFloat(row[k]); if (!isNaN(v)) return v; }
+  }
+  return 0;
+}
+
+function extractMetrics(rows) {
+  const t=[], h=[], spd_ms=[], spd_kmh=[], dist=[], sats=[], bat=[];
+  const pitch=[], roll=[], hdg=[], lat=[], lon=[], z_ms=[], volt=[];
+  const states=[], msgs=[], dtimes=[];
+
+  for (const r of rows) {
+    t.push(gv(r,'time(millisecond)') / 1000);
+    h.push(gv(r,'height_above_takeoff(feet)') * FEET_TO_M);
+    const s = gv(r,'speed(mph)');
+    spd_ms.push(s * MPH_TO_MS);
+    spd_kmh.push(s * MPH_TO_KMH);
+    dist.push(gv(r,'distance(feet)') * FEET_TO_M);
+    sats.push(Math.round(gv(r,'satellites')));
+    bat.push(gv(r,'battery_percent'));
+    pitch.push(gv(r,' pitch(degrees)','pitch(degrees)'));
+    roll.push(gv(r,' roll(degrees)','roll(degrees)'));
+    hdg.push(gv(r,' compass_heading(degrees)','compass_heading(degrees)'));
+    const la = parseFloat(r['latitude']||''), lo = parseFloat(r['longitude']||'');
+    lat.push(isNaN(la) ? 0 : la);
+    lon.push(isNaN(lo) ? 0 : lo);
+    z_ms.push(gv(r,' zSpeed(mph)','zSpeed(mph)') * MPH_TO_MS);
+    volt.push(gv(r,'voltage(v)'));
+    states.push(r['flycState'] || '');
+    msgs.push(r['message'] || '');
+    dtimes.push(r['datetime(utc)'] || '');
+  }
+  return { t, h, spd_ms, spd_kmh, dist, sats, bat, pitch, roll, hdg, lat, lon, z_ms, volt, states, msgs, dtimes };
+}
+
+function buildSummary(m) {
+  const t = m.t;
+  if (!t.length) return {};
+  const maxH = Math.max(...m.h), maxSms = Math.max(...m.spd_ms);
+  const maxKmh = Math.max(...m.spd_kmh), maxDist = Math.max(...m.dist);
+  const duration = Math.max(...t);
+
+  let jStart=null, jEnd=null;
+  for (let i=0;i<t.length;i++) {
+    if (t[i]>5 && m.sats[i]===0 && jStart===null) jStart=t[i];
+    if (jStart && m.sats[i]>0 && t[i]>jStart && jEnd===null) jEnd=t[i];
+  }
+  let spoof=null;
+  for (let i=0;i<t.length;i++) {
+    if (t[i]>10 && Math.abs(m.lat[i])<1 && Math.abs(m.lon[i])<1) { spoof=t[i]; break; }
+  }
+  const attiTimes=[];
+  let lastA=-999;
+  for (let i=0;i<t.length;i++) {
+    if (m.states[i].toUpperCase().includes('ATTI') && t[i]-lastA>5) { attiTimes.push(t[i]); lastA=t[i]; }
+  }
+  const allMsgs = m.msgs.join(' ').toLowerCase();
+  const isCrash = ['shock','crash','exiting gps'].some(w=>allMsgs.includes(w));
+  const minBat  = Math.min(...m.bat.filter(b=>b>0));
+
+  return {
+    duration_s: r1(duration), max_height_m: r1(maxH),
+    max_speed_ms: r1(maxSms), max_speed_kmh: r1(maxKmh),
+    max_distance_m: r1(maxDist), is_crash: isCrash,
+    jamming_start_s: jStart ? r1(jStart) : null,
+    jamming_end_s:   jEnd   ? r1(jEnd)   : null,
+    spoof_time_s:    spoof  ? r1(spoof)  : null,
+    atti_times: attiTimes.slice(0,5).map(r1),
+    max_descent_ms: r1(Math.abs(Math.min(...m.z_ms))),
+    final_height_m: r1(m.h[m.h.length-1]||0),
+    min_battery_pct: r1(minBat||0),
+    start_dt: m.dtimes[0]||'', end_dt: m.dtimes[m.dtimes.length-1]||''
+  };
+}
+
+function r1(v) { return Math.round(v*10)/10; }
+
+function secToLocalStr(dtStr, sec) {
+  if (!dtStr || sec===null) return '—';
+  const m = dtStr.match(/(\d+)\.(\d+)\.(\d+)\s+(\d+):(\d+)/);
+  if (!m) return '—';
+  const d = new Date(+m[3],+m[2]-1,+m[1],+m[4]+2,+m[5],0);
+  d.setSeconds(d.getSeconds()+Math.round(sec));
+  return d.toTimeString().slice(0,8);
+}
+
+// ── STATS CARDS ──────────────────────────────────────────────────────────
+function renderStats(s) {
+  const grid = document.getElementById('statsGrid');
+  const startLocal = secToLocalStr(s.start_dt, 0);
+  const endLocal   = secToLocalStr(s.start_dt, s.duration_s);
+  const cards = [
+    { v: s.duration_s+'с',    l:'Тривалість польоту',  c:'' },
+    { v: s.max_height_m+'м',  l:'Макс. висота',         c:'' },
+    { v: s.max_distance_m+'м',l:'Макс. дистанція',      c:'' },
+    { v: s.max_speed_kmh+' км/год', l:'Макс. швидкість', c: s.max_speed_kmh>100?'danger':'' },
+    { v: s.min_battery_pct+'%', l:'Мін. заряд АКБ',    c: s.min_battery_pct<20?'warn':'' },
+    { v: s.jamming_start_s ? s.jamming_start_s+'с' : '—', l:'Початок РЕБ-джамінгу', c: s.jamming_start_s?'warn':'' },
+    { v: s.spoof_time_s ? s.spoof_time_s+'с' : '—',       l:'GNSS-спуфінг',          c: s.spoof_time_s?'danger':'' },
+    { v: s.is_crash ? 'АВАРІЯ' : 'Норма',               l:'Статус завершення',      c: s.is_crash?'danger':'ok' },
+  ];
+  grid.innerHTML = cards.map(c =>
+    `<div class="stat-card"><div class="val ${c.c}">${c.v}</div><div class="lbl">${c.l}</div></div>`
+  ).join('');
+}
+
+// ── EVENTS TABLE ─────────────────────────────────────────────────────────
+function renderEvents(m, s) {
+  const ev = [];
+  ev.push({ t:0, type:'ok', desc:'Зліт. Початок місії.' });
+  if (s.jamming_start_s) ev.push({ t:s.jamming_start_s, type:'reb',
+    desc:`Початок РЕБ-джамінгу. Кількість супутників впала до 0.` });
+  if (s.atti_times.length) ev.push({ t:s.atti_times[0], type:'atti',
+    desc:`Перехід у режим ATTI (керування без GPS-стабілізації).` });
+  if (s.spoof_time_s) ev.push({ t:s.spoof_time_s, type:'spoof',
+    desc:`GNSS-спуфінг — координати обнулено (0,0). Аномальне прискорення до ${s.max_speed_kmh} км/год.` });
+  if (s.jamming_end_s) ev.push({ t:s.jamming_end_s, type:'reb',
+    desc:`Відновлення GPS-сигналу після джамінгу.` });
+
+  const seen=new Set();
+  m.msgs.forEach((msg,i) => {
+    if (!msg||seen.has(msg)||msg.length<4) return;
+    seen.add(msg);
+    const ml=msg.toLowerCase();
+    const type = ml.includes('shock')?'spoof' : ml.includes('gps')||ml.includes('error')?'reb' : ml.includes('atti')?'atti' : 'ok';
+    ev.push({ t:m.t[i], type, desc:msg.slice(0,140) });
+  });
+
+  ev.sort((a,b)=>a.t-b.t);
+  const bMap={reb:'badge-reb',spoof:'badge-spoof',atti:'badge-atti',ok:'badge-ok'};
+  const lMap={reb:'РЕБ',spoof:'Спуфінг',atti:'ATTI',ok:'Штатно'};
+
+  document.getElementById('eventsBody').innerHTML = ev.map(e => `
+    <tr>
+      <td class="t-cell">${r1(e.t)}</td>
+      <td class="t-cell">${secToLocalStr(m.dtimes[0], e.t)}</td>
+      <td><span class="badge ${bMap[e.type]}">${lMap[e.type]}</span></td>
+      <td>${e.desc}</td>
+    </tr>`
+  ).join('');
+}
+
+// ── CHARTS ───────────────────────────────────────────────────────────────
+// Base Plotly layout — uses fonts that render Cyrillic correctly
+const BASE = {
+  paper_bgcolor:'rgba(0,0,0,0)',
+  plot_bgcolor:'rgba(0,0,0,0)',
+  font:{ family:'"Noto Sans","Arial Unicode MS",Arial,sans-serif', color:'#9ca3af', size:11 },
+  margin:{ l:50, r:14, t:8, b:40 },
+  xaxis:{ gridcolor:'#252a35', zerolinecolor:'#252a35',
+          title:{ text:'t, s', font:{size:11} }, tickfont:{size:10} },
+  yaxis:{ gridcolor:'#252a35', zerolinecolor:'#252a35', tickfont:{size:10} },
+  showlegend:false,
+  hovermode:'x unified',
+};
+const CFG = { responsive:true, displayModeBar:false };
+
+function annoShapes(s) {
+  const shapes=[], annots=[];
+  if (s.jamming_start_s) {
+    shapes.push({ type:'line', x0:s.jamming_start_s, x1:s.jamming_start_s,
+      y0:0, y1:1, yref:'paper', line:{color:'#ff6b35',width:1.5,dash:'dash'} });
+    annots.push({ x:s.jamming_start_s, y:0.97, yref:'paper', xanchor:'left',
+      text:'РЕБ', showarrow:false, font:{color:'#ff6b35',size:10} });
+  }
+  if (s.spoof_time_s) {
+    shapes.push({ type:'line', x0:s.spoof_time_s, x1:s.spoof_time_s,
+      y0:0, y1:1, yref:'paper', line:{color:'#ff3355',width:2,dash:'dot'} });
+    annots.push({ x:s.spoof_time_s, y:0.97, yref:'paper', xanchor:'left',
+      text:'Spoof', showarrow:false, font:{color:'#ff3355',size:10} });
+  }
+  return { shapes, annotations:annots };
+}
+
+function lay(extra, s) {
+  const { shapes, annotations } = annoShapes(s);
+  return Object.assign({}, BASE, { shapes, annotations }, extra);
+}
+
+function renderCharts(m, s) {
+  const t = m.t;
+
+  // 1. Height
+  Plotly.newPlot('chartHeight', [{
+    x:t, y:m.h, type:'scatter', mode:'lines', name:'Висота, м',
+    line:{color:'#00d4aa',width:2}, fill:'tozeroy', fillcolor:'rgba(0,212,170,.08)'
+  }], lay({ yaxis:{...BASE.yaxis, title:{text:'м',font:{size:11}}} }, s), CFG);
+
+  // 2. Speed
+  Plotly.newPlot('chartSpeed', [{
+    x:t, y:m.spd_kmh, type:'scatter', mode:'lines', name:'Швидкiсть',
+    line:{color:'#0099ff',width:2}
+  }], lay({ yaxis:{...BASE.yaxis, title:{text:'км/год',font:{size:11}}} }, s), CFG);
+
+  // 3. Distance
+  Plotly.newPlot('chartDist', [{
+    x:t, y:m.dist, type:'scatter', mode:'lines', name:'Дистанцiя',
+    line:{color:'#a78bfa',width:2}
+  }], lay({ yaxis:{...BASE.yaxis, title:{text:'м',font:{size:11}}} }, s), CFG);
+
+  // 4. Satellites
+  Plotly.newPlot('chartSats', [{
+    x:t, y:m.sats, type:'bar', name:'Супутники',
+    marker:{ color: m.sats.map(v => v===0?'#ff3355':v<6?'#ff6b35':'#22c55e') }
+  }], lay({ yaxis:{...BASE.yaxis, title:{text:'шт',font:{size:11}}} }, s), CFG);
+
+  // 5. Battery
+  Plotly.newPlot('chartBat', [{
+    x:t, y:m.bat, type:'scatter', mode:'lines', name:'АКБ',
+    line:{color:'#f59e0b',width:2}, fill:'tozeroy', fillcolor:'rgba(245,158,11,.08)'
+  }], lay({
+    yaxis:{...BASE.yaxis, range:[0,105], title:{text:'%',font:{size:11}}}
+  }, s), CFG);
+
+  // 6. Pitch/Roll
+  Plotly.newPlot('chartAttitude', [
+    { x:t, y:m.pitch, type:'scatter', mode:'lines', name:'Pitch',
+      line:{color:'#f472b6',width:1.5} },
+    { x:t, y:m.roll,  type:'scatter', mode:'lines', name:'Roll',
+      line:{color:'#fb923c',width:1.5} }
+  ], lay({
+    showlegend:true,
+    legend:{bgcolor:'rgba(0,0,0,0)', font:{size:11, color:'#9ca3af'}},
+    yaxis:{...BASE.yaxis, title:{text:'градуси',font:{size:11}}}
+  }, s), CFG);
+
+  // 7. Vertical speed
+  Plotly.newPlot('chartVspeed', [{
+    x:t, y:m.z_ms, type:'scatter', mode:'lines', name:'Верт. швидкiсть',
+    line:{color:'#38bdf8',width:1.5}, fill:'tozeroy', fillcolor:'rgba(56,189,248,.06)'
+  }], lay({ yaxis:{...BASE.yaxis, title:{text:'м/с',font:{size:11}}} }, s), CFG);
+
+  // 8. Voltage
+  Plotly.newPlot('chartVolt', [{
+    x:t, y:m.volt, type:'scatter', mode:'lines', name:'Напруга',
+    line:{color:'#fbbf24',width:1.5}
+  }], lay({ yaxis:{...BASE.yaxis, title:{text:'В',font:{size:11}}} }, s), CFG);
+
+  // 9. Flight state (categorical bar)
+  const stateMap = { 'P-GPS':3, 'ATTI':2, 'Motors_Started':1, 'Assisted_Takeoff':1 };
+  const stateNums = m.states.map(st => {
+    for (const k in stateMap) if (st.includes(k)) return stateMap[k];
+    return 0;
+  });
+  const stateColors = stateNums.map(n =>
+    n===3?'#22c55e' : n===2?'#0099ff' : n===1?'#f59e0b' : '#374151'
+  );
+  const { shapes:sh2, annotations:an2 } = annoShapes(s);
+  Plotly.newPlot('chartState', [{
+    x:t, y:stateNums, type:'bar', name:'Режим',
+    marker:{color:stateColors},
+    hovertemplate:'%{customdata}<extra></extra>',
+    customdata:m.states
+  }], {
+    ...BASE,
+    yaxis:{ ...BASE.yaxis, tickvals:[0,1,2,3],
+            ticktext:['—','Takeoff','ATTI','P-GPS'], fixedrange:true },
+    bargap:0, shapes:sh2, annotations:an2
+  }, CFG);
+
+  // 10. Trajectory map
+  const validIdx = m.lat.map((_,i) => Math.abs(m.lat[i])>1 && Math.abs(m.lon[i])>1 ? i : -1).filter(i=>i>=0);
+  const mLat = validIdx.map(i=>m.lat[i]);
+  const mLon = validIdx.map(i=>m.lon[i]);
+  const mH   = validIdx.map(i=>m.h[i]);
+  const mT   = validIdx.map(i=>m.t[i]);
+
+  const traces = [{
+    type:'scattermapbox', lat:mLat, lon:mLon, mode:'lines+markers',
+    line:{color:'#00d4aa',width:2},
+    marker:{ size:4, color:mH, colorscale:'Viridis',
+      colorbar:{ title:{text:'Висота, м',font:{size:11,color:'#9ca3af'}},
+        thickness:10, len:0.6, tickfont:{color:'#9ca3af'} } },
+    text:mT.map((ti,i)=>`t=${ti}c  H=${mH[i].toFixed(1)}м`),
+    hovertemplate:'%{text}<extra></extra>', name:'Маршрут'
+  }];
+  if (mLat.length) {
+    traces.push({ type:'scattermapbox', lat:[mLat[0]], lon:[mLon[0]],
+      mode:'markers', marker:{size:13,color:'#22c55e'}, name:'Зліт',
+      hovertemplate:'Зліт<extra></extra>' });
+    traces.push({ type:'scattermapbox', lat:[mLat[mLat.length-1]], lon:[mLon[mLon.length-1]],
+      mode:'markers', marker:{size:14,color:'#ff3355',symbol:'star'}, name:'Кінець',
+      hovertemplate:'Кінець польоту<extra></extra>' });
+  }
+  const cLat = mLat.reduce((a,b)=>a+b,0)/(mLat.length||1);
+  const cLon = mLon.reduce((a,b)=>a+b,0)/(mLon.length||1);
+
+  Plotly.newPlot('chartMap', traces, {
+    paper_bgcolor:'rgba(0,0,0,0)',
+    font:{family:'Arial,sans-serif', color:'#9ca3af'},
+    mapbox:{ style:'carto-darkmatter', center:{lat:cLat, lon:cLon}, zoom:14 },
+    margin:{l:0,r:0,t:0,b:0},
+    showlegend:true,
+    legend:{bgcolor:'rgba(17,19,24,.85)', font:{color:'#9ca3af',size:11}}
+  }, { ...CFG, mapboxAccessToken:'' });
+}
+
+// ── AI ANALYSIS ──────────────────────────────────────────────────────────
+async function runAnalysis() {
+  if (!missionType) { showError('Оберіть тип місії (ВТРАТА або ПОШКОДЖЕННЯ)'); return; }
+  if (!csvText)     { showError('Спочатку завантажте CSV-файл'); return; }
+
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('loader').classList.add('visible');
+  showError('');
+
+  try {
+    const res = await fetch('/analyze', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ csv:csvText, mission_type:missionType, filename:fileName })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('messengerText').textContent = data.messenger || '';
+    document.getElementById('reportText').textContent    = data.report    || '';
+    if (data.summary) renderStats(data.summary);
+
+    // Scroll to messenger block
+    document.querySelector('.messenger-block').scrollIntoView({ behavior:'smooth', block:'start' });
+
+  } catch(e) {
+    showError('Помилка: ' + e.message);
+  } finally {
+    document.getElementById('loader').classList.remove('visible');
+    document.getElementById('analyzeBtn').disabled = false;
+  }
+}
+
+// ── UTILS ────────────────────────────────────────────────────────────────
+function copyMessenger() {
+  const text = document.getElementById('messengerText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Скопійовано';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Копіювати'; btn.classList.remove('copied'); }, 2500);
+  });
+}
+
+function toggleSection(header) {
+  header.classList.toggle('collapsed');
+  header.nextElementSibling.classList.toggle('hidden');
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.textContent = msg;
+  box.classList.toggle('visible', !!msg);
+}
+
+function resetAll() {
+  csvText = ''; metrics = {}; fileName = ''; missionType = null;
+  fileInput.value = '';
+  document.getElementById('fileInfo').classList.remove('visible');
+  document.getElementById('btnLoss').className   = 'mission-btn';
+  document.getElementById('btnDamage').className = 'mission-btn';
+  checkAnalyzeBtn();
+  showError('');
+  document.getElementById('results').classList.remove('visible');
+  document.getElementById('loader').classList.remove('visible');
+  document.getElementById('messengerText').textContent = '';
+  document.getElementById('reportText').textContent    = '';
+}
+
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' Б';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' КБ';
+  return (bytes/1048576).toFixed(2) + ' МБ';
+}
+</script>
+</body>
+</html>
