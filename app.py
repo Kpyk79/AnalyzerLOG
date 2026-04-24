@@ -1,7 +1,9 @@
 import os
+import io
+import csv
 import json
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,19 +22,102 @@ def parse_val(v):
         return None
 
 
+def detect_separator(first_line):
+    """Return '\t', ',' or ';' based on which delimiter dominates the header line."""
+    tabs   = first_line.count('\t')
+    commas = first_line.count(',')
+    semis  = first_line.count(';')
+    if tabs > commas and tabs > semis:
+        return '\t'
+    return ',' if commas > semis else ';'
+
+
+def normalize_datetime(dt_str):
+    """Convert any recognized datetime format to DD.MM.YYYY H:MM."""
+    dt_str = dt_str.strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M"):
+        try:
+            dt = datetime.strptime(dt_str, fmt)
+            # Format: day no-padded, month zero-padded, hour no-padded, minute zero-padded
+            return f"{dt.day}.{dt.month:02d}.{dt.year} {dt.hour}:{dt.minute:02d}"
+        except ValueError:
+            pass
+    return dt_str  # return unchanged if not recognized
+
+
+def normalize_csv(text):
+    """
+    Convert comma-separated Airdata CSV (format 1) to semicolon-separated
+    format 2.  Uses csv.reader so quoted fields (e.g. message) are parsed
+    correctly and stored without surrounding quotes in the output — exactly
+    matching the structure of native format-2 files.
+    Also converts datetime(utc) to DD.MM.YYYY H:MM.
+    Returns (normalized_text, was_converted).
+    """
+    lines = [l for l in text.splitlines() if l.strip()]
+    if not lines:
+        return text, False
+
+    sep = detect_separator(lines[0])
+    if sep != ',':
+        return text, False  # tab or semicolon — no conversion needed
+
+    reader = csv.reader(io.StringIO(text))          # handles quoted fields
+    all_rows = list(reader)
+    if not all_rows:
+        return text, False
+
+    headers = [h.strip() for h in all_rows[0]]
+    dt_col  = next((i for i, h in enumerate(headers)
+                    if h == 'datetime(utc)'), None)
+
+    out_lines = [';'.join(headers)]
+    for row in all_rows[1:]:
+        row = list(row)
+        if dt_col is not None and dt_col < len(row):
+            row[dt_col] = normalize_datetime(row[dt_col])
+        out_lines.append(';'.join(row))
+
+    return '\n'.join(out_lines), True
+
+
 def parse_csv(text):
+    """Parse tab-, comma- or semicolon-separated Airdata CSV into (headers, rows)."""
     lines = [l for l in text.splitlines() if l.strip()]
     if not lines:
         return None, None
-    headers = [h.strip() for h in lines[0].split(";")]
-    rows = []
-    for line in lines[1:]:
-        cols = line.split(";")
-        row = {}
-        for i, h in enumerate(headers):
-            row[h] = cols[i].strip() if i < len(cols) else ""
-        rows.append(row)
-    return headers, rows
+
+    sep = detect_separator(lines[0])
+
+    if sep == ';':
+        # Already normalised — simple split
+        headers = [h.strip() for h in lines[0].split(';')]
+        rows = []
+        for line in lines[1:]:
+            cols = line.split(';')
+            row = {}
+            for i, h in enumerate(headers):
+                row[h] = cols[i].strip() if i < len(cols) else ""
+            rows.append(row)
+        return headers, rows
+    else:
+        # tab or comma: use csv module, then normalise datetime on the fly
+        reader = csv.reader(io.StringIO(text), delimiter=sep)
+        all_rows = list(reader)
+        if not all_rows:
+            return None, None
+        headers = [h.strip() for h in all_rows[0]]
+        dt_col = next((i for i, h in enumerate(headers) if h == 'datetime(utc)'), None)
+        rows = []
+        for r in all_rows[1:]:
+            row = {}
+            for i, h in enumerate(headers):
+                val = r[i].strip() if i < len(r) else ""
+                if i == dt_col:
+                    val = normalize_datetime(val)
+                row[h] = val
+            rows.append(row)
+        return headers, rows
 
 
 def gv(row, *keys):
@@ -317,6 +402,30 @@ def build_prompt(summary, filename, mission_type="ВТРАТА"):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/normalize", methods=["POST"])
+def normalize():
+    """Convert comma-CSV (format 1) to semicolon-CSV (format 2) and return as download."""
+    try:
+        data = request.get_json(force=True)
+        csv_text = data.get("csv", "")
+        filename = data.get("filename", "flight.csv")
+
+        if not csv_text:
+            return jsonify({"error": "Порожній файл"}), 400
+
+        normalized, was_converted = normalize_csv(csv_text)
+
+        # Return as downloadable file
+        out_name = filename.replace(".csv", "_normalized.csv")
+        return Response(
+            normalized,
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{out_name}"'}
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/analyze", methods=["POST"])
