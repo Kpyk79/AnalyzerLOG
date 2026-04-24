@@ -785,17 +785,35 @@ const CFG = { responsive:true, displayModeBar:false };
 
 function annoShapes(s) {
   const shapes=[], annots=[];
-  if (s.jamming_start_s) {
-    shapes.push({ type:'line', x0:s.jamming_start_s, x1:s.jamming_start_s,
-      y0:0, y1:1, yref:'paper', line:{color:'#ff6b35',width:1.5,dash:'dash'} });
-    annots.push({ x:s.jamming_start_s, y:0.97, yref:'paper', xanchor:'left',
-      text:'РЕБ', showarrow:false, font:{color:'#ff6b35',size:10} });
+  const j = s.jamming_start_s, sp = s.spoof_time_s;
+  // If both exist and are within 30s of each other → mirror sides to avoid overlap
+  const tooClose = j && sp && Math.abs(j - sp) < 30;
+
+  if (j) {
+    shapes.push({ type:'line', x0:j, x1:j, y0:0, y1:1, yref:'paper',
+      line:{color:'#ff6b35', width:1.5, dash:'dash'} });
+    annots.push({
+      x:j, y:0.98, yref:'paper', yanchor:'top',
+      // When close: РЕБ label goes LEFT of its line
+      xanchor: tooClose ? 'right' : 'left',
+      text: tooClose ? 'РЕБ ◀' : '▶ РЕБ',
+      showarrow:false,
+      font:{color:'#ff6b35', size:10, family:'Arial,sans-serif'},
+      bgcolor:'rgba(10,12,16,0.82)', borderpad:3
+    });
   }
-  if (s.spoof_time_s) {
-    shapes.push({ type:'line', x0:s.spoof_time_s, x1:s.spoof_time_s,
-      y0:0, y1:1, yref:'paper', line:{color:'#ff3355',width:2,dash:'dot'} });
-    annots.push({ x:s.spoof_time_s, y:0.97, yref:'paper', xanchor:'left',
-      text:'Spoof', showarrow:false, font:{color:'#ff3355',size:10} });
+  if (sp) {
+    shapes.push({ type:'line', x0:sp, x1:sp, y0:0, y1:1, yref:'paper',
+      line:{color:'#ff3355', width:2, dash:'dot'} });
+    annots.push({
+      x:sp, y:0.98, yref:'paper', yanchor:'top',
+      // Spoof label always goes RIGHT of its line
+      xanchor:'left',
+      text:'▶ Spoof',
+      showarrow:false,
+      font:{color:'#ff3355', size:10, family:'Arial,sans-serif'},
+      bgcolor:'rgba(10,12,16,0.82)', borderpad:3
+    });
   }
   return { shapes, annotations:annots };
 }
