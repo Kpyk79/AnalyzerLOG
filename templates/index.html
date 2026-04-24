@@ -178,6 +178,43 @@
     background: rgba(255,107,53,.1);
     color: var(--warn);
   }
+  .mission-btn.selected-has {
+    border-color: var(--green);
+    background: rgba(34,197,94,.1);
+    color: var(--green);
+  }
+  .mission-btn.selected-none {
+    border-color: var(--text-dim);
+    background: rgba(107,114,128,.08);
+    color: var(--text-dim);
+  }
+  .mission-btn.selected-active {
+    border-color: var(--accent);
+    background: rgba(0,212,170,.1);
+    color: var(--accent);
+  }
+  .mission-btn.selected-notactive {
+    border-color: var(--warn);
+    background: rgba(245,158,11,.1);
+    color: var(--warn);
+  }
+  .sub-row {
+    margin-top: 10px;
+    padding: 12px 14px;
+    background: rgba(0,212,170,.04);
+    border: 1px solid rgba(0,212,170,.15);
+    border-radius: 12px;
+    display: none;
+  }
+  .sub-row.visible { display: block; }
+  .sub-label {
+    font-size: 11px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
 
   /* ── ANALYZE BUTTON ── */
   .analyze-row {
@@ -490,6 +527,32 @@
     </div>
   </div>
 
+  <!-- FIRMWARE 1001 -->
+  <div class="mission-row" style="margin-top:10px">
+    <div class="mission-label">Прошивка «1001»</div>
+    <div class="mission-btns">
+      <button class="mission-btn" id="btnHas1001" onclick="selectFirmware('є')">
+        🛡&nbsp; є 1001
+      </button>
+      <button class="mission-btn" id="btnNo1001" onclick="selectFirmware('немає')">
+        ✕&nbsp; немає 1001
+      </button>
+    </div>
+
+    <!-- ANTISPOOF — показується тільки якщо "є 1001" -->
+    <div class="sub-row" id="antispoofRow">
+      <div class="sub-label">⚡ Режим антиспуфінгу (примусове відключення навіг. стеку)</div>
+      <div class="mission-btns">
+        <button class="mission-btn" id="btnActivated" onclick="selectAntispoof('активовано')">
+          ✅&nbsp; Активовано
+        </button>
+        <button class="mission-btn" id="btnNotActivated" onclick="selectAntispoof('не активовано')">
+          ⚠️&nbsp; Не активовано
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ANALYZE BUTTON -->
   <div class="analyze-row">
     <button class="btn btn-primary" id="analyzeBtn" disabled onclick="runAnalysis()">
@@ -606,11 +669,13 @@
 
 <script>
 // ── STATE ────────────────────────────────────────────────────────────────
-let csvText    = '';   // semicolon-normalised, used internally by parseCSV()
-let rawCsvText = '';   // original file bytes — used for comma→tab download
-let metrics    = {};
-let fileName   = '';
-let missionType = null; // 'ВТРАТА' | 'ПОШКОДЖЕННЯ'
+let csvText      = '';     // semicolon-normalised, used internally by parseCSV()
+let rawCsvText   = '';     // original file bytes — used for comma→; download
+let metrics      = {};
+let fileName     = '';
+let missionType  = null;   // 'ВТРАТА' | 'ПОШКОДЖЕННЯ'
+let firmware1001 = null;   // 'є' | 'немає'
+let antispoof    = null;   // 'активовано' | 'не активовано' | null
 
 // ── DRAG & DROP ──────────────────────────────────────────────────────────
 const dropzone  = document.getElementById('dropzone');
@@ -787,8 +852,40 @@ function selectMission(type) {
   checkAnalyzeBtn();
 }
 
+// ── FIRMWARE / ANTISPOOF ─────────────────────────────────────────────────
+function selectFirmware(val) {
+  firmware1001 = val;
+  document.getElementById('btnHas1001').className =
+    'mission-btn' + (val === 'є' ? ' selected-has' : '');
+  document.getElementById('btnNo1001').className =
+    'mission-btn' + (val === 'немає' ? ' selected-none' : '');
+
+  const row = document.getElementById('antispoofRow');
+  if (val === 'є') {
+    row.classList.add('visible');
+  } else {
+    row.classList.remove('visible');
+    antispoof = null;
+    document.getElementById('btnActivated').className    = 'mission-btn';
+    document.getElementById('btnNotActivated').className = 'mission-btn';
+  }
+  checkAnalyzeBtn();
+}
+
+function selectAntispoof(val) {
+  antispoof = val;
+  document.getElementById('btnActivated').className =
+    'mission-btn' + (val === 'активовано' ? ' selected-active' : '');
+  document.getElementById('btnNotActivated').className =
+    'mission-btn' + (val === 'не активовано' ? ' selected-notactive' : '');
+  checkAnalyzeBtn();
+}
+
 function checkAnalyzeBtn() {
-  document.getElementById('analyzeBtn').disabled = !(csvText && missionType);
+  const firmwareReady = firmware1001 !== null &&
+    (firmware1001 === 'немає' || antispoof !== null);
+  document.getElementById('analyzeBtn').disabled =
+    !(csvText && missionType && firmwareReady);
 }
 
 // ── CSV PARSER ───────────────────────────────────────────────────────────
@@ -1135,7 +1232,13 @@ async function runAnalysis() {
     const res = await fetch('/analyze', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ csv:csvText, mission_type:missionType, filename:fileName })
+      body: JSON.stringify({
+        csv: csvText,
+        mission_type: missionType,
+        filename: fileName,
+        firmware_1001: firmware1001,
+        antispoof_active: firmware1001 === 'є' ? antispoof : null
+      })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -1178,14 +1281,20 @@ function showError(msg) {
 }
 
 function resetAll() {
-  csvText = ''; rawCsvText = ''; metrics = {}; fileName = ''; missionType = null;
+  csvText = ''; rawCsvText = ''; metrics = {}; fileName = '';
+  missionType = null; firmware1001 = null; antispoof = null;
   fileInput.value = '';
   document.getElementById('fileInfo').classList.remove('visible');
   document.getElementById('formatBadge').textContent = '';
   document.getElementById('formatBadge').className = 'badge-format';
   document.getElementById('dlNormBtn').classList.remove('visible');
-  document.getElementById('btnLoss').className   = 'mission-btn';
-  document.getElementById('btnDamage').className = 'mission-btn';
+  document.getElementById('btnLoss').className        = 'mission-btn';
+  document.getElementById('btnDamage').className      = 'mission-btn';
+  document.getElementById('btnHas1001').className     = 'mission-btn';
+  document.getElementById('btnNo1001').className      = 'mission-btn';
+  document.getElementById('btnActivated').className   = 'mission-btn';
+  document.getElementById('btnNotActivated').className= 'mission-btn';
+  document.getElementById('antispoofRow').classList.remove('visible');
   checkAnalyzeBtn();
   showError('');
   document.getElementById('results').classList.remove('visible');
