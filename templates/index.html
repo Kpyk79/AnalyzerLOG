@@ -93,6 +93,23 @@
   .file-icon { font-size: 26px; flex-shrink: 0; }
   .file-details h3 { color: #fff; font-size: 14px; word-break: break-all; }
   .file-details p { color: var(--text-dim); font-size: 12px; }
+  .file-details .badges { display:flex; gap:6px; margin-top:4px; flex-wrap:wrap; }
+  .badge-format {
+    display:inline-block; padding:2px 9px; border-radius:20px;
+    font-size:11px; font-weight:700;
+  }
+  .badge-format.csv2 { background:rgba(34,197,94,.12); color:var(--green); border:1px solid rgba(34,197,94,.25); }
+  .badge-format.csv1 { background:rgba(245,158,11,.12); color:var(--yellow); border:1px solid rgba(245,158,11,.25); }
+  .badge-format.converted { background:rgba(0,153,255,.12); color:var(--accent2); border:1px solid rgba(0,153,255,.25); }
+  .dl-btn {
+    display:none; align-items:center; gap:6px;
+    padding:5px 12px; border-radius:8px; border:1px solid rgba(0,153,255,.3);
+    background:rgba(0,153,255,.08); color:var(--accent2);
+    cursor:pointer; font-size:12px; font-weight:700; font-family:inherit;
+    transition:all .2s; text-decoration:none; white-space:nowrap;
+  }
+  .dl-btn:hover { background:rgba(0,153,255,.18); }
+  .dl-btn.visible { display:inline-flex; }
 
   /* ── MISSION TYPE BUTTONS ── */
   .mission-row {
@@ -413,7 +430,7 @@
     <input type="file" id="fileInput" accept=".csv">
     <div class="upload-icon">📂</div>
     <h2>Перетягніть CSV-файл або натисніть для вибору</h2>
-    <p>Формат DJI Airdata — розділювач «;»</p>
+    <p>DJI Airdata CSV — Формат 1 (кома/TAB) автоматично → Формат 2 (крапка з комою)</p>
   </div>
 
   <div class="file-info" id="fileInfo">
@@ -421,6 +438,12 @@
     <div class="file-details">
       <h3 id="fileName">—</h3>
       <p id="fileSize">—</p>
+      <div class="badges">
+        <span class="badge-format" id="formatBadge"></span>
+        <button class="dl-btn" id="dlNormBtn" onclick="downloadNormalized()">
+          ⬇ Завантажити нормалізований CSV
+        </button>
+      </div>
     </div>
   </div>
 
@@ -553,9 +576,10 @@
 
 <script>
 // ── STATE ────────────────────────────────────────────────────────────────
-let csvText = '';
-let metrics  = {};
-let fileName = '';
+let csvText    = '';   // semicolon-normalised, used internally by parseCSV()
+let rawCsvText = '';   // original file bytes — used for comma→tab download
+let metrics    = {};
+let fileName   = '';
 let missionType = null; // 'ВТРАТА' | 'ПОШКОДЖЕННЯ'
 
 // ── DRAG & DROP ──────────────────────────────────────────────────────────
@@ -575,6 +599,68 @@ dropzone.addEventListener('drop', ev => {
 });
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
 
+function detectSep(firstLine) {
+  const tabs   = (firstLine.match(/\t/g)  || []).length;
+  const commas = (firstLine.match(/,/g)   || []).length;
+  const semis  = (firstLine.match(/;/g)   || []).length;
+  if (tabs > commas && tabs > semis) return '\t';
+  return commas > semis ? ',' : ';';
+}
+
+function normalizeCSVClient(text) {
+  /**
+   * Convert tab- or comma-separated Airdata CSV to semicolon format 2.
+   * Returns { normalized: string, converted: boolean, sep: detected separator }
+   */
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return { normalized: text, converted: false, sep: ';' };
+
+  const sep = detectSep(lines[0]);
+  if (sep === ';') return { normalized: text, converted: false, sep };
+
+  // Parse a single CSV row respecting quoted fields (only needed for comma sep)
+  function parseRowComma(line) {
+    const result = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+    result.push(cur);
+    return result;
+  }
+
+  function parseRowTab(line) { return line.split('\t'); }
+
+  function normDt(dt) {
+    dt = dt.trim();
+    // "2025-12-30 08:12:24" or "2026-04-23 03:50:05" → "23.04.2026 3:50"
+    const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+    if (!m) return dt;
+    const [, yr, mo, dy, hh, mm] = m;
+    return `${parseInt(dy)}.${mo}.${yr} ${parseInt(hh)}:${mm}`;
+  }
+
+  const parseRow = sep === '\t' ? parseRowTab : parseRowComma;
+  const allRows  = lines.map(parseRow);
+  const headers  = allRows[0].map(h => h.trim());
+  const dtCol    = headers.indexOf('datetime(utc)');
+
+  const outLines = [headers.join(';')];
+  for (const row of allRows.slice(1)) {
+    const cells = row.map((c, i) => {
+      c = c.trim();
+      if (i === dtCol) c = normDt(c);
+      return c;
+    });
+    outLines.push(cells.join(';'));
+  }
+
+  return { normalized: outLines.join('\n'), converted: true, sep };
+}
+
 function loadFile(f) {
   fileName = f.name;
   document.getElementById('fileName').textContent = f.name;
@@ -585,9 +671,28 @@ function loadFile(f) {
 
   const reader = new FileReader();
   reader.onload = e => {
-    csvText = e.target.result;
+    const raw = e.target.result;
+    rawCsvText = raw;                                          // keep original for download
+    const { normalized, converted, sep } = normalizeCSVClient(raw);
+
+    csvText = normalized;
+
+    // Show format badge
+    const badge = document.getElementById('formatBadge');
+    const dlBtn = document.getElementById('dlNormBtn');
+    if (converted) {
+      const sepLabel = sep === '\t' ? 'TAB' : 'кома';
+      badge.textContent = `⚠ Формат 1 (${sepLabel}) → Формат 2 (;)`;
+      badge.className = 'badge-format converted';
+      dlBtn.classList.add('visible');
+    } else {
+      badge.textContent = '✓ Формат 2 (крапка з комою)';
+      badge.className = 'badge-format csv2';
+      dlBtn.classList.remove('visible');
+    }
+
     const rows = parseCSV(csvText);
-    metrics  = extractMetrics(rows);
+    metrics = extractMetrics(rows);
     const summary = buildSummary(metrics);
 
     document.getElementById('results').classList.add('visible');
@@ -596,6 +701,52 @@ function loadFile(f) {
     renderCharts(metrics, summary);
   };
   reader.readAsText(f, 'UTF-8');
+}
+
+function downloadNormalized() {
+  if (!rawCsvText || !fileName) return;
+
+  // Re-parse original comma CSV properly (handles quoted fields, strips quotes)
+  // then join with ';' → exact Format 2 structure.
+  function parseRowComma(line) {
+    const result = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+    result.push(cur);
+    return result;
+  }
+
+  function normDt(dt) {
+    dt = dt.trim();
+    const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+    if (!m) return dt;
+    return `${parseInt(m[3])}.${m[2]}.${m[1]} ${parseInt(m[4])}:${m[5]}`;
+  }
+
+  const lines   = rawCsvText.split(/\r?\n/).filter(l => l.trim());
+  const headers = parseRowComma(lines[0]).map(h => h.trim());
+  const dtCol   = headers.indexOf('datetime(utc)');
+
+  const outLines = [headers.join(';')];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseRowComma(lines[i]).map(c => c.trim());
+    if (dtCol >= 0 && dtCol < cols.length) cols[dtCol] = normDt(cols[dtCol]);
+    outLines.push(cols.join(';'));
+  }
+
+  const bom  = '\uFEFF'; // UTF-8 BOM — Excel відкриває файл правильно
+  const blob = new Blob([bom + outLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = fileName.replace(/\.csv$/i, '_normalized.csv');
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── MISSION SELECTION ────────────────────────────────────────────────────
@@ -997,9 +1148,12 @@ function showError(msg) {
 }
 
 function resetAll() {
-  csvText = ''; metrics = {}; fileName = ''; missionType = null;
+  csvText = ''; rawCsvText = ''; metrics = {}; fileName = ''; missionType = null;
   fileInput.value = '';
   document.getElementById('fileInfo').classList.remove('visible');
+  document.getElementById('formatBadge').textContent = '';
+  document.getElementById('formatBadge').className = 'badge-format';
+  document.getElementById('dlNormBtn').classList.remove('visible');
   document.getElementById('btnLoss').className   = 'mission-btn';
   document.getElementById('btnDamage').className = 'mission-btn';
   checkAnalyzeBtn();
