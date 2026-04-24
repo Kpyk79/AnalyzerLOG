@@ -4,6 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>AnalyzerLOG — Аналіз польотних логів БпЛА</title>
+
+<!-- ── PWA ──────────────────────────────────────────────────────── -->
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#00d4aa">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AnalyzerLOG">
+
+<!-- ── Favicon ──────────────────────────────────────────────────── -->
+<link rel="icon" type="image/x-icon"  href="/static/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-16.png">
+
+<!-- ── Apple touch icons ────────────────────────────────────────── -->
+<link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="144x144" href="/static/icons/icon-144.png">
+<link rel="apple-touch-icon" sizes="128x128" href="/static/icons/icon-128.png">
+<link rel="apple-touch-icon" sizes="96x96"   href="/static/icons/icon-96.png">
+<link rel="apple-touch-icon" sizes="72x72"   href="/static/icons/icon-72.png">
+
+<!-- ── SEO / Social ─────────────────────────────────────────────── -->
+<meta name="description" content="Аналіз польотних логів DJI Airdata CSV з ШІ-звітом українською">
+
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
   :root {
@@ -417,10 +441,16 @@
 
 <div class="header">
   <div class="header-logo">🛰</div>
-  <div>
+  <div style="flex:1">
     <h1>AnalyzerLOG</h1>
     <p>Аналіз польотних логів БпЛА · DJI Airdata CSV</p>
   </div>
+  <button id="installBtn" onclick="installApp()" style="display:none;align-items:center;gap:6px;
+    padding:7px 14px;border-radius:10px;border:1px solid rgba(0,212,170,.35);
+    background:rgba(0,212,170,.1);color:#00d4aa;cursor:pointer;
+    font-size:12px;font-weight:700;font-family:inherit;white-space:nowrap;">
+    ⬇ Встановити
+  </button>
 </div>
 
 <div class="container">
@@ -1168,6 +1198,35 @@ function fmtSize(bytes) {
   if (bytes < 1024) return bytes + ' Б';
   if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' КБ';
   return (bytes/1048576).toFixed(2) + ' МБ';
+}
+
+// ── PWA: Service Worker registration ─────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js')
+      .then(reg => console.log('[SW] registered, scope:', reg.scope))
+      .catch(err => console.warn('[SW] registration failed:', err));
+  });
+}
+
+// ── PWA: Install prompt ──────────────────────────────────────────
+let _deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  // Show install button if it exists
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = 'inline-flex';
+});
+window.addEventListener('appinstalled', () => {
+  _deferredInstall = null;
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = 'none';
+});
+function installApp() {
+  if (!_deferredInstall) return;
+  _deferredInstall.prompt();
+  _deferredInstall.userChoice.then(() => { _deferredInstall = null; });
 }
 </script>
 </body>
