@@ -130,7 +130,7 @@ def gv(row, *keys):
 
 
 def extract_metrics(rows):
-    t, h, spd_ms, spd_kmh, dist, sats, bat = [], [], [], [], [], [], []
+    t, h, spd_ms, spd_kmh, dist, sats, gpslvl, bat = [], [], [], [], [], [], [], []
     pitch, roll, hdg, lat, lon, z_ms, volt = [], [], [], [], [], [], []
     states, msgs, dtimes = [], [], []
 
@@ -157,9 +157,10 @@ def extract_metrics(rows):
         states.append(r.get("flycState", ""))
         msgs.append(r.get("message", ""))
         dtimes.append(r.get("datetime(utc)", ""))
+        gpslvl.append(int(gv(r, "gpslevel")))
 
     return dict(t=t, h=h, spd_ms=spd_ms, spd_kmh=spd_kmh, dist=dist,
-                sats=sats, bat=bat, pitch=pitch, roll=roll, hdg=hdg,
+                sats=sats, gpslvl=gpslvl, bat=bat, pitch=pitch, roll=roll, hdg=hdg,
                 lat=lat, lon=lon, z_ms=z_ms, volt=volt,
                 states=states, msgs=msgs, dtimes=dtimes)
 
