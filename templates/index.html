@@ -624,6 +624,10 @@
             <div class="chart-title">Кількість супутників GPS</div>
             <div id="chartSats" style="height:240px"></div>
           </div>
+          <div class="chart-wrap chart-full">
+            <div class="chart-title">Якість сигналу GNSS — рівень (0–5) + супутники</div>
+            <div id="chartGnss" style="height:240px"></div>
+          </div>
           <div class="chart-wrap">
             <div class="chart-title">Заряд акумулятора, %</div>
             <div id="chartBat" style="height:240px"></div>
@@ -913,7 +917,7 @@ function gv(row, ...keys) {
 function extractMetrics(rows) {
   const t=[], h=[], spd_ms=[], spd_kmh=[], dist=[], sats=[], bat=[];
   const pitch=[], roll=[], hdg=[], lat=[], lon=[], z_ms=[], volt=[];
-  const states=[], msgs=[], dtimes=[];
+  const states=[], msgs=[], dtimes=[], gpslvl=[];
 
   for (const r of rows) {
     t.push(gv(r,'time(millisecond)') / 1000);
@@ -923,6 +927,7 @@ function extractMetrics(rows) {
     spd_kmh.push(s * MPH_TO_KMH);
     dist.push(gv(r,'distance(feet)') * FEET_TO_M);
     sats.push(Math.round(gv(r,'satellites')));
+    gpslvl.push(Math.round(gv(r,'gpslevel')));
     bat.push(gv(r,'battery_percent'));
     pitch.push(gv(r,' pitch(degrees)','pitch(degrees)'));
     roll.push(gv(r,' roll(degrees)','roll(degrees)'));
@@ -936,7 +941,7 @@ function extractMetrics(rows) {
     msgs.push(r['message'] || '');
     dtimes.push(r['datetime(utc)'] || '');
   }
-  return { t, h, spd_ms, spd_kmh, dist, sats, bat, pitch, roll, hdg, lat, lon, z_ms, volt, states, msgs, dtimes };
+  return { t, h, spd_ms, spd_kmh, dist, sats, gpslvl, bat, pitch, roll, hdg, lat, lon, z_ms, volt, states, msgs, dtimes };
 }
 
 function buildSummary(m) {
@@ -1058,6 +1063,11 @@ const BASE = {
   yaxis:{ gridcolor:'#252a35', zerolinecolor:'#252a35', tickfont:{size:10} },
   showlegend:false,
   hovermode:'x unified',
+  hoverlabel:{
+    bgcolor:'#111318',
+    bordercolor:'#2a2f3a',
+    font:{ color:'#c8cdd6', family:'Arial,sans-serif', size:12 }
+  },
 };
 const CFG = { responsive:true, displayModeBar:false };
 
@@ -1127,6 +1137,58 @@ function renderCharts(m, s) {
     x:t, y:m.sats, type:'bar', name:'Супутники',
     marker:{ color: m.sats.map(v => v===0?'#ff3355':v<6?'#ff6b35':'#22c55e') }
   }], lay({ yaxis:{...BASE.yaxis, title:{text:'шт',font:{size:11}}} }, s), CFG);
+
+  // 4b. GNSS quality (gpslevel 0-5 bars + satellites line, dual-axis)
+  const gpsColors = {
+    0: '#ff3355', // немає сигналу
+    1: '#ff6b35', // дуже слабкий
+    2: '#f59e0b', // слабкий
+    3: '#facc15', // задовільний
+    4: '#22c55e', // хороший
+    5: '#00d4aa', // відмінний
+  };
+  const gpsLabels = {
+    0:'Немає (0)', 1:'Дуже слабкий (1)', 2:'Слабкий (2)',
+    3:'Задовільний (3)', 4:'Хороший (4)', 5:'Відмінний (5)'
+  };
+  const { shapes: gnssShapes, annotations: gnssAnnots } = annoShapes(s);
+  Plotly.newPlot('chartGnss', [
+    {
+      x: t, y: m.gpslvl, type: 'bar', name: 'Рівень GNSS',
+      marker: { color: m.gpslvl.map(v => gpsColors[v] ?? '#374151') },
+      hovertemplate: '%{customdata}<extra></extra>',
+      customdata: m.gpslvl.map(v => gpsLabels[v] ?? v),
+      yaxis: 'y'
+    },
+    {
+      x: t, y: m.sats, type: 'scatter', mode: 'lines', name: 'Супутники',
+      line: { color: 'rgba(255,255,255,0.35)', width: 1.5, dash: 'dot' },
+      hovertemplate: '%{y} сат.<extra></extra>',
+      yaxis: 'y2'
+    }
+  ], {
+    ...BASE,
+    bargap: 0,
+    showlegend: true,
+    legend: { bgcolor:'rgba(0,0,0,0)', font:{size:11,color:'#9ca3af'},
+              orientation:'h', x:0, y:1.12 },
+    yaxis: {
+      ...BASE.yaxis,
+      title: { text:'Рівень (0–5)', font:{size:11} },
+      range: [0, 5.4],
+      tickvals: [0,1,2,3,4,5],
+      ticktext: ['0 Немає','1','2','3','4','5 Відмінно'],
+    },
+    yaxis2: {
+      ...BASE.yaxis,
+      title: { text:'Супутники', font:{size:11} },
+      overlaying: 'y', side: 'right',
+      showgrid: false,
+      tickfont: { size:10, color:'rgba(255,255,255,0.3)' }
+    },
+    shapes: gnssShapes,
+    annotations: gnssAnnots
+  }, CFG);
 
   // 5. Battery
   Plotly.newPlot('chartBat', [{
@@ -1212,6 +1274,8 @@ function renderCharts(m, s) {
   Plotly.newPlot('chartMap', traces, {
     paper_bgcolor:'rgba(0,0,0,0)',
     font:{family:'Arial,sans-serif', color:'#9ca3af'},
+    hoverlabel:{ bgcolor:'#111318', bordercolor:'#2a2f3a',
+                 font:{color:'#c8cdd6', family:'Arial,sans-serif', size:12} },
     mapbox:{ style:'carto-darkmatter', center:{lat:cLat, lon:cLon}, zoom:14 },
     margin:{l:0,r:0,t:0,b:0},
     showlegend:true,
