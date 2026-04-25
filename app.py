@@ -2,6 +2,7 @@ import os
 import io
 import csv
 import json
+import re
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template, Response
 from dotenv import load_dotenv
@@ -248,6 +249,46 @@ def build_summary(m):
     all_msgs_lc = " ".join(m["msgs"]).lower()
     is_crash = any(w in all_msgs_lc for w in ["shock", "crash", "exiting gps"])
 
+    # Compass anomalies: heading jumps >60° per step
+    hdg = m["hdg"]
+    compass_jump_idx = []
+    for i in range(1, len(hdg)):
+        diff = abs(hdg[i] - hdg[i-1])
+        if diff > 180:
+            diff = 360 - diff
+        if diff > 60:
+            compass_jump_idx.append(i)
+    spinning_detected = False
+    for i in range(len(compass_jump_idx) - 2):
+        t_start = t[compass_jump_idx[i]]
+        t_end   = t[compass_jump_idx[i + 2]]
+        if t_end - t_start <= 3:
+            spinning_detected = True
+            break
+
+    # Data Recorder File Index (internal DJI flight counter)
+    flight_index = None
+    for msg in m["msgs"]:
+        match = re.search(r"Data Recorder File Index is (\d+)", msg)
+        if match:
+            flight_index = int(match.group(1))
+            break
+
+    # Flight modes used during flight
+    MODE_MAP = {
+        "sport":  "Sport",
+        "cine":   "Cine",
+        "p-gps":  "Normal",
+        "opti":   "Normal",
+        "atti":   "ATTI",
+    }
+    used_modes = []
+    for st in m["states"]:
+        st_lc = st.lower()
+        for key, label in MODE_MAP.items():
+            if key in st_lc and label not in used_modes:
+                used_modes.append(label)
+
     min_bat = min((b for b in m["bat"] if b > 0), default=0)
     final_height = m["h"][-1] if m["h"] else 0
 
@@ -288,6 +329,11 @@ def build_summary(m):
         "key_messages": key_messages[:25],
         "total_rows": len(t),
         "start_dt_raw": start_dt,
+        "flight_index": flight_index,
+        "flight_modes": used_modes,
+        "compass_jumps": len(compass_jump_idx),
+        "compass_jump_t": [round(t[i], 1) for i in compass_jump_idx],
+        "spinning_detected": spinning_detected,
     }
 
 
