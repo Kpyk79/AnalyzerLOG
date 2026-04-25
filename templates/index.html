@@ -350,6 +350,44 @@
   .stat-card .val.ok { color: var(--green); }
   .stat-card .lbl { font-size: 11px; color: var(--text-dim); margin-top: 5px; line-height: 1.3; }
 
+  /* ── COORD BLOCK ── */
+  .coord-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .coord-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .coord-card .coord-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .coord-card .coord-val {
+    font-family: monospace;
+    font-size: 13px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+  .coord-card a.map-link {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--accent2);
+    text-decoration: none;
+    opacity: 0.85;
+  }
+  .coord-card a.map-link:hover { opacity: 1; text-decoration: underline; }
+
   /* ── SECTION ── */
   .section {
     background: var(--bg2);
@@ -382,6 +420,18 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 14px;
   }
+  .chart-group-label {
+    grid-column: 1 / -1;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    padding: 4px 2px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+  .chart-group-label:first-child { border-top: none; margin-top: 0; }
   .chart-wrap {
     background: var(--bg3);
     border: 1px solid var(--border);
@@ -453,6 +503,7 @@
     .upload-zone h2 { font-size: 15px; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .stat-card .val { font-size: 18px; }
+    .coord-row { grid-template-columns: 1fr; }
     .charts-grid { grid-template-columns: 1fr; }
     .chart-full { grid-column: 1; }
     .messenger-text { padding-right: 0; padding-bottom: 44px; }
@@ -582,6 +633,14 @@
     <!-- STATS -->
     <div class="stats-grid" id="statsGrid"></div>
 
+    <!-- COORDINATES -->
+    <div id="coordBlock" style="display:none;margin-bottom:14px">
+      <div class="coord-row">
+        <div class="coord-card" id="coordHome"></div>
+        <div class="coord-card" id="coordFinal"></div>
+      </div>
+    </div>
+
     <!-- EVENTS -->
     <div class="section">
       <div class="section-header" onclick="toggleSection(this)">
@@ -608,50 +667,70 @@
       </div>
       <div class="section-body">
         <div class="charts-grid" id="chartsGrid">
+
+          <!-- ── Рух ─────────────────────────────────────────────── -->
+          <div class="chart-group-label">Рух</div>
           <div class="chart-wrap">
             <div class="chart-title">Висота над точкою зльоту, м</div>
-            <div id="chartHeight" style="height:240px"></div>
+            <div id="chartHeight" style="height:220px"></div>
           </div>
           <div class="chart-wrap">
-            <div class="chart-title">Горизонтальна швидкість, км/год</div>
-            <div id="chartSpeed" style="height:240px"></div>
+            <div class="chart-title">Горизонтальна швидкість, м/с</div>
+            <div id="chartSpeed" style="height:220px"></div>
           </div>
           <div class="chart-wrap">
             <div class="chart-title">Дистанція від точки зльоту, м</div>
-            <div id="chartDist" style="height:240px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Кількість супутників GPS</div>
-            <div id="chartSats" style="height:240px"></div>
-          </div>
-          <div class="chart-wrap chart-full">
-            <div class="chart-title">Якість сигналу GNSS — рівень (0–5) + супутники</div>
-            <div id="chartGnss" style="height:240px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Заряд акумулятора, %</div>
-            <div id="chartBat" style="height:240px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
-            <div id="chartAttitude" style="height:240px"></div>
+            <div id="chartDist" style="height:220px"></div>
           </div>
           <div class="chart-wrap">
             <div class="chart-title">Вертикальна швидкість, м/с</div>
-            <div id="chartVspeed" style="height:240px"></div>
+            <div id="chartVspeed" style="height:220px"></div>
+          </div>
+
+          <!-- ── Навігація ──────────────────────────────────────── -->
+          <div class="chart-group-label">Навігація</div>
+          <div class="chart-wrap chart-full">
+            <div class="chart-title">Якість сигналу GNSS — рівень (0–5) та кількість супутників</div>
+            <div id="chartGnss" style="height:220px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Компас — курс (°) та аномалії</div>
+            <div id="chartCompass" style="height:220px"></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Кількість супутників GPS</div>
+            <div id="chartSats" style="height:220px"></div>
+          </div>
+
+          <!-- ── Живлення ───────────────────────────────────────── -->
+          <div class="chart-group-label">Живлення</div>
+          <div class="chart-wrap">
+            <div class="chart-title">Заряд акумулятора, %</div>
+            <div id="chartBat" style="height:220px"></div>
           </div>
           <div class="chart-wrap">
             <div class="chart-title">Напруга акумулятора, В</div>
-            <div id="chartVolt" style="height:240px"></div>
+            <div id="chartVolt" style="height:220px"></div>
           </div>
+
+          <!-- ── Орієнтація ─────────────────────────────────────── -->
+          <div class="chart-group-label">Орієнтація</div>
+          <div class="chart-wrap chart-full">
+            <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
+            <div id="chartAttitude" style="height:200px"></div>
+          </div>
+
+          <!-- ── Режим / Карта ──────────────────────────────────── -->
+          <div class="chart-group-label">Режим та маршрут</div>
           <div class="chart-wrap chart-full">
             <div class="chart-title">Режим польоту по часу</div>
-            <div id="chartState" style="height:180px"></div>
+            <div id="chartState" style="height:160px"></div>
           </div>
           <div class="chart-wrap chart-full">
             <div class="chart-title">Траєкторія польоту</div>
             <div id="chartMap" style="height:380px"></div>
           </div>
+
         </div>
       </div>
     </div>
@@ -796,6 +875,7 @@ function loadFile(f) {
 
     document.getElementById('results').classList.add('visible');
     renderStats(summary);
+    renderCoords(summary);
     renderEvents(metrics, summary);
     renderCharts(metrics, summary);
   };
@@ -969,6 +1049,39 @@ function buildSummary(m) {
   const isCrash = ['shock','crash','exiting gps'].some(w=>allMsgs.includes(w));
   const minBat  = Math.min(...m.bat.filter(b=>b>0));
 
+  // Compass anomalies: heading jumps >60° per step (100ms)
+  const compassJumpIdx = [];
+  for (let i = 1; i < m.hdg.length; i++) {
+    let diff = Math.abs(m.hdg[i] - m.hdg[i-1]);
+    if (diff > 180) diff = 360 - diff;
+    if (diff > 60) compassJumpIdx.push(i);
+  }
+  // Spinning: ≥3 jumps within any 3-second window
+  let spinningDetected = false;
+  for (let i = 0; i < compassJumpIdx.length - 2; i++) {
+    const tStart = m.t[compassJumpIdx[i]];
+    const tEnd   = m.t[compassJumpIdx[i+2]];
+    if (tEnd - tStart <= 3) { spinningDetected = true; break; }
+  }
+
+  // Data Recorder File Index
+  let flightIndex = null;
+  for (const msg of m.msgs) {
+    const match = msg.match(/Data Recorder File Index is (\d+)/);
+    if (match) { flightIndex = parseInt(match[1]); break; }
+  }
+
+  // Flight modes used
+  const MODE_MAP = { 'sport':'Sport', 'cine':'Cine', 'p-gps':'Normal',
+                     'opti':'Normal', 'atti':'ATTI' };
+  const usedModes = [];
+  for (const st of m.states) {
+    const lc = st.toLowerCase();
+    for (const [key, label] of Object.entries(MODE_MAP)) {
+      if (lc.includes(key) && !usedModes.includes(label)) usedModes.push(label);
+    }
+  }
+
   return {
     duration_s: r1(duration), max_height_m: r1(maxH),
     max_speed_ms: r1(maxSms), max_speed_kmh: r1(maxKmh),
@@ -980,7 +1093,14 @@ function buildSummary(m) {
     max_descent_ms: r1(Math.abs(Math.min(...m.z_ms))),
     final_height_m: r1(m.h[m.h.length-1]||0),
     min_battery_pct: r1(minBat||0),
-    start_dt: m.dtimes[0]||'', end_dt: m.dtimes[m.dtimes.length-1]||''
+    start_dt: m.dtimes[0]||'', end_dt: m.dtimes[m.dtimes.length-1]||'',
+    flight_index: flightIndex,
+    flight_modes: usedModes,
+    compass_jumps: compassJumpIdx.length,
+    compass_jump_t: compassJumpIdx.map(i => m.t[i]),
+    spinning_detected: spinningDetected,
+    home_lat: m.lat[0] || null, home_lon: m.lon[0] || null,
+    final_lat: m.lat[m.lat.length-1] || null, final_lon: m.lon[m.lon.length-1] || null,
   };
 }
 
@@ -1000,12 +1120,22 @@ function renderStats(s) {
   const grid = document.getElementById('statsGrid');
   const startLocal = secToLocalStr(s.start_dt, 0);
   const endLocal   = secToLocalStr(s.start_dt, s.duration_s);
+  // Flight modes label + color
+  const modesLabel = (s.flight_modes && s.flight_modes.length)
+    ? s.flight_modes.join(' / ') : '—';
+  const modeColor  = s.flight_modes && s.flight_modes.includes('Sport') ? 'warn'
+                   : s.flight_modes && s.flight_modes.includes('Cine')  ? 'ok' : '';
+
   const cards = [
     { v: s.duration_s+'с',    l:'Тривалість польоту',  c:'' },
     { v: s.max_height_m+'м',  l:'Макс. висота',         c:'' },
     { v: s.max_distance_m+'м',l:'Макс. дистанція',      c:'' },
-    { v: s.max_speed_kmh+' км/год', l:'Макс. швидкість', c: s.max_speed_kmh>100?'danger':'' },
+    { v: s.max_speed_ms+' м/с', l:'Макс. швидкість', c: s.max_speed_kmh>100?'danger':'' },
     { v: s.min_battery_pct+'%', l:'Мін. заряд АКБ',    c: s.min_battery_pct<20?'warn':'' },
+    { v: s.flight_index != null ? '#'+s.flight_index : '—', l:'Лічильник польотів (DJI)', c:'ok' },
+    { v: modesLabel,           l:'Режим польоту',        c: modeColor },
+    { v: s.spinning_detected ? '⚠ Спінінг' : s.compass_jumps > 0 ? s.compass_jumps+' стрибк.' : '✓ Норма',
+      l:'Компас', c: s.spinning_detected ? 'danger' : s.compass_jumps > 0 ? 'warn' : 'ok' },
     { v: s.jamming_start_s ? s.jamming_start_s+'с' : '—', l:'Початок РЕБ-джамінгу', c: s.jamming_start_s?'warn':'' },
     { v: s.spoof_time_s ? s.spoof_time_s+'с' : '—',       l:'GNSS-спуфінг',          c: s.spoof_time_s?'danger':'' },
     { v: s.is_crash ? 'АВАРІЯ' : 'Норма',               l:'Статус завершення',      c: s.is_crash?'danger':'ok' },
@@ -1013,6 +1143,27 @@ function renderStats(s) {
   grid.innerHTML = cards.map(c =>
     `<div class="stat-card"><div class="val ${c.c}">${c.v}</div><div class="lbl">${c.l}</div></div>`
   ).join('');
+}
+
+// ── COORD BLOCK ──────────────────────────────────────────────────────────
+function renderCoords(s) {
+  const block = document.getElementById('coordBlock');
+  const validCoord = (lat, lon) => lat && lon && !(lat === 0 && lon === 0);
+
+  function coordCard(id, title, lat, lon) {
+    const el = document.getElementById(id);
+    if (!validCoord(lat, lon)) { el.innerHTML = `<div class="coord-title">${title}</div><div style="color:var(--text-dim);font-size:12px">Координати недоступні</div>`; return; }
+    const latF = lat.toFixed(7), lonF = lon.toFixed(7);
+    const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
+    el.innerHTML = `
+      <div class="coord-title">${title}</div>
+      <div class="coord-val">${latF}, ${lonF}</div>
+      <a class="map-link" href="${gmUrl}" target="_blank" rel="noopener">Відкрити в Google Maps ↗</a>`;
+  }
+
+  coordCard('coordHome',  'Домашня точка (зліт)', s.home_lat,  s.home_lon);
+  coordCard('coordFinal', 'Фінальна точка (посадка)', s.final_lat, s.final_lon);
+  block.style.display = 'block';
 }
 
 // ── EVENTS TABLE ─────────────────────────────────────────────────────────
@@ -1027,6 +1178,9 @@ function renderEvents(m, s) {
     desc:`GNSS-спуфінг — координати обнулено (0,0). Аномальне прискорення до ${s.max_speed_kmh} км/год.` });
   if (s.jamming_end_s) ev.push({ t:s.jamming_end_s, type:'reb',
     desc:`Відновлення GPS-сигналу після джамінгу.` });
+  if (s.spinning_detected && s.compass_jump_t && s.compass_jump_t.length)
+    ev.push({ t: s.compass_jump_t[0], type:'spoof',
+      desc:`Виявлено спінінг — ${s.compass_jumps} різких стрибків компаса (>60°/крок). Можливе падіння або механічне руйнування.` });
 
   const seen=new Set();
   m.msgs.forEach((msg,i) => {
@@ -1122,9 +1276,9 @@ function renderCharts(m, s) {
 
   // 2. Speed
   Plotly.newPlot('chartSpeed', [{
-    x:t, y:m.spd_kmh, type:'scatter', mode:'lines', name:'Швидкiсть',
+    x:t, y:m.spd_ms, type:'scatter', mode:'lines', name:'Швидкiсть',
     line:{color:'#0099ff',width:2}
-  }], lay({ yaxis:{...BASE.yaxis, title:{text:'км/год',font:{size:11}}} }, s), CFG);
+  }], lay({ yaxis:{...BASE.yaxis, title:{text:'м/с',font:{size:11}}} }, s), CFG);
 
   // 3. Distance
   Plotly.newPlot('chartDist', [{
@@ -1222,7 +1376,30 @@ function renderCharts(m, s) {
     line:{color:'#fbbf24',width:1.5}
   }], lay({ yaxis:{...BASE.yaxis, title:{text:'В',font:{size:11}}} }, s), CFG);
 
-  // 9. Flight state (categorical bar)
+  // 9. Compass heading + anomaly markers
+  const jumpIdx = s.compass_jump_t || [];
+  const jumpSet = new Set(jumpIdx.map(v => Math.round(v * 10)));
+  Plotly.newPlot('chartCompass', [
+    {
+      x: t, y: m.hdg, type: 'scatter', mode: 'lines', name: 'Курс',
+      line: { color: '#a78bfa', width: 1.5 }
+    },
+    {
+      x: jumpIdx,
+      y: jumpIdx.map(jt => { const i = t.findIndex(v => Math.round(v*10) === Math.round(jt*10)); return i>=0 ? m.hdg[i] : null; }),
+      type: 'scatter', mode: 'markers', name: 'Аномалія',
+      marker: { color: '#ff3355', size: 8, symbol: 'x' },
+      hovertemplate: 'Стрибок компаса %{x:.1f}с<extra></extra>'
+    }
+  ], lay({
+    yaxis: { ...BASE.yaxis, range:[0,360], tickvals:[0,90,180,270,360],
+             ticktext:['0° Пн','90° Сх','180° Пд','270° Зх','360°'],
+             title:{text:'Курс °',font:{size:11}} },
+    showlegend: true,
+    legend:{ bgcolor:'rgba(0,0,0,0)', font:{size:11,color:'#9ca3af'} }
+  }, s), CFG);
+
+  // 10. Flight state (categorical bar)
   const stateMap = { 'P-GPS':3, 'ATTI':2, 'Motors_Started':1, 'Assisted_Takeoff':1 };
   const stateNums = m.states.map(st => {
     for (const k in stateMap) if (st.includes(k)) return stateMap[k];
