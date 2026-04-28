@@ -2525,25 +2525,20 @@
       return maxIdx;
     }
 
-    // forceManualHome = true  → ignore log GPS entirely; integrate from t=0
-    //                           using the operator-supplied home coords.
-    //                           Use this when the user has entered coords manually
-    //                           (spoofed log GPS, no-GPS flight, operator-anchored start).
-    // forceManualHome = false → normal mode: find last valid GPS fix in the log
-    //                           and start integration from there.
+    // forceManualHome = true  → ignore log GPS; integrate from t=0 using
+    //                           the operator-supplied coords as anchor.
+    // forceManualHome = false → find last valid GPS fix in log; start from there.
     function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs,
                                   forceManualHome = false) {
       const { t, lat, lon, spd_ms, hdg } = m;
-      // Height above takeoff in metres
-      const h = m.h || m.alt || m.height || [];
+      const h    = m.h   || m.alt || m.height || [];
+      const z_ms = m.z_ms || [];
 
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 1 — Determine base position and integration start index
-      // ═══════════════════════════════════════════════════════════════
+      // ════════════════════════════════════════════════════════════════
+      // STEP 1 — Base position (start of integration)
+      // ════════════════════════════════════════════════════════════════
       let lastValidIdx = -1, baseLat = homeLat, baseLon = homeLon;
-
       if (!forceManualHome) {
-        // Normal mode: use last valid GPS from the log
         for (let i = 0; i < lat.length; i++) {
           if (Math.abs(lat[i]) > 0.01 && Math.abs(lon[i]) > 0.01) {
             lastValidIdx = i;
@@ -2552,126 +2547,97 @@
           }
         }
       }
-      // forceManualHome = true → lastValidIdx stays -1, baseLat/Lon = manual input
-
-      const noGps    = lastValidIdx < 0;   // true for no-GPS log OR forceManualHome
+      const noGps    = lastValidIdx < 0;
       const startIdx = noGps ? 0 : lastValidIdx;
 
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 2 — Find the peak height index (incident altitude)
-      //   This is where the drone began its uncontrolled descent.
-      // ═══════════════════════════════════════════════════════════════
-      const peakIdxRaw = h.length >= 10 ? findLastPeakBeforeDescent(h) : t.length - 1;
-      const peakIdx = Math.max(startIdx, Math.min(peakIdxRaw, t.length - 1));
-
-      // Incident height (AGL, metres) at the peak / GPS-loss moment
-      const incidentH = (h.length > peakIdx && h[peakIdx] > 0) ? h[peakIdx]
-        : (h.length > startIdx ? (h[startIdx] || 0) : 0);
-      const peakT = t.length > peakIdx ? t[peakIdx] : t[startIdx];
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 3 — Active-flight integration (GPS ground-speed telemetry)
+      // ════════════════════════════════════════════════════════════════
+      // STEP 2 — Phase 1: integrate FULL post-GPS trajectory
       //
-      // "Treadmill" principle:
-      //   V_ground = V_drone_air + V_wind  (as vectors)
-      //   Because telemetry spd_ms is GPS-derived (i.e. ground speed),
-      //   the wind effect is ALREADY encoded — we simply integrate.
-      //   If wind > drone airspeed the GPS speed will reflect the drone
-      //   being blown backward (net ground speed in the wind direction).
-      // ═══════════════════════════════════════════════════════════════
+      // "Treadmill" principle: spd_ms is GPS-derived ground speed,
+      // wind already encoded → just integrate heading × speed × dt.
+      //
+      // We integrate to the END of telemetry (not just to the peak),
+      // because the accident can happen at any altitude or phase:
+      //   • signal loss at 85 m cruise altitude
+      //   • loss of control during landing at 3 m
+      //   • crash on approach, etc.
+      // The last telemetry sample is the last KNOWN position.
+      // ════════════════════════════════════════════════════════════════
       let drLat = baseLat, drLon = baseLon, drDistOwn = 0;
 
-      for (let i = startIdx; i < peakIdx && i < t.length - 1; i++) {
+      for (let i = startIdx; i < t.length - 1; i++) {
         const dt = t[i + 1] - t[i];
         if (dt <= 0 || dt > 10) continue;
         const hdgRad = ((hdg[i] || 0) * Math.PI) / 180;
-        const spd = Math.max(0, spd_ms[i] || 0);
+        const spd    = Math.max(0, spd_ms[i] || 0);
         const latRad = drLat * Math.PI / 180;
-        drLat += (spd * Math.cos(hdgRad) * dt) / 111320;
-        drLon += (spd * Math.sin(hdgRad) * dt) / (111320 * Math.cos(latRad));
+        drLat    += (spd * Math.cos(hdgRad) * dt) / 111320;
+        drLon    += (spd * Math.sin(hdgRad) * dt) / (111320 * Math.cos(latRad));
         drDistOwn += spd * dt;
       }
 
-      // Incident position after active-flight integration
+      // Last known position = end of telemetry = incident point
       const incidentLat = drLat;
       const incidentLon = drLon;
+      const lastIdx     = Math.max(0, t.length - 1);
+      // Height at last telemetry point (AGL, metres)
+      const incidentH   = Math.max(0, h.length > lastIdx ? (h[lastIdx] || 0) : 0);
 
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 4 — Physics free-fall model
+      // ════════════════════════════════════════════════════════════════
+      // STEP 3 — Phase 2: remaining free fall from last known height
       //
-      //   t_fall = H / v_descent
-      //     H          = incidentH (metres AGL)
-      //     v_descent  = measured descent rate if available, else 2.2 m/s
-      //                  (DJI Mavic auto-landing ~2.2 m/s; free-fall ~4–5 m/s)
+      //   t_fall = incidentH / descent_rate
+      //   drift  = V_wind × t_fall  in the downwind direction
       //
-      //   Wind drift during fall:
-      //     distance = V_wind × t_fall  (metres)
-      //     direction = downwind = windDirDeg + 180°
-      //       (wind FROM 315° NW → drone drifts TOWARD 135° SE)
-      //
-      //   Final point = incident_point + drift_vector
-      // ═══════════════════════════════════════════════════════════════
-
-      // Use measured descent speed if sensible, otherwise default to 2.2 m/s
-      const z_ms = m.z_ms || [];
+      // Naturally handles all scenarios:
+      //   incidentH = 85 m → ~39 s fall, significant wind drift
+      //   incidentH =  3 m → ~1.4 s fall, negligible drift (landing crash)
+      //   incidentH =  0 m → already on ground, no drift
+      // ════════════════════════════════════════════════════════════════
       let measuredDescent = 0;
-      if (z_ms.length > peakIdx) {
-        // DJI z_ms: positive = up; descent is negative → invert
-        measuredDescent = -(z_ms[peakIdx] || 0);
+      if (z_ms.length > lastIdx) {
+        measuredDescent = -(z_ms[lastIdx] || 0); // DJI: positive=up → invert
       }
       const descentRate = (measuredDescent > 0.5 && measuredDescent < 10)
         ? measuredDescent : 2.2;
 
-      // Free-fall time (seconds)
-      const fallTimeS = incidentH > 0 ? incidentH / descentRate : 0;
-
-      // Downwind azimuth: wind blows FROM windDirDeg → drift TOWARD windDirDeg + 180°
+      const fallTimeS   = incidentH > 0 ? incidentH / descentRate : 0;
       const downwindDeg = (windDirDeg + 180) % 360;
       const downwindRad = downwindDeg * Math.PI / 180;
+      const windDriftM  = windSpeedMs * fallTimeS;
 
-      // Horizontal wind drift during free-fall
-      const windDriftM = windSpeedMs * fallTimeS;
-
-      // Apply drift vector to incident position
       const latRad0 = incidentLat * Math.PI / 180;
       drLat = incidentLat + (windDriftM * Math.cos(downwindRad)) / 111320;
       drLon = incidentLon + (windDriftM * Math.sin(downwindRad)) / (111320 * Math.cos(latRad0));
 
-      // ═══════════════════════════════════════════════════════════════
-      // Return full detail for the AI prompt and the info card
-      // ═══════════════════════════════════════════════════════════════
       const drTimeSecs = t.length > startIdx ? t[t.length - 1] - t[startIdx] : 0;
 
       return {
-        // Final predicted landing point
-        lat: drLat,
-        lon: drLon,
-        // Last known GPS position
-        last_valid_lat: baseLat,
-        last_valid_lon: baseLon,
-        last_valid_t: noGps ? null : Math.round(t[lastValidIdx]),
-        no_gps: noGps,
-        dist_own_m: Math.round(drDistOwn),
-        // Wind vector info
-        wind_to_deg: Math.round(downwindDeg),
-        dr_duration_s: Math.round(drTimeSecs),
+        lat:              drLat,
+        lon:              drLon,
+        last_valid_lat:   baseLat,
+        last_valid_lon:   baseLon,
+        last_valid_t:     noGps ? null : Math.round(t[lastValidIdx]),
+        no_gps:           noGps,
+        manual_home:      forceManualHome,
+        dist_own_m:       Math.round(drDistOwn),
+        wind_to_deg:      Math.round(downwindDeg),
+        dr_duration_s:    Math.round(drTimeSecs),
         steps_integrated: t.length - startIdx,
-        // Incident (peak) info
-        incident_lat: incidentLat,
-        incident_lon: incidentLon,
-        incident_h_m: Math.round(incidentH),
+        // Incident = last known position at end of telemetry
+        incident_lat:     incidentLat,
+        incident_lon:     incidentLon,
+        incident_h_m:     Math.round(incidentH),
         // Free-fall physics
-        fall_time_s: +fallTimeS.toFixed(1),
-        descent_rate_ms: +descentRate.toFixed(2),
-        wind_drift_m: Math.round(windDriftM),
-        // Legacy aliases expected by AI prompt / result card
-        peak_lat: incidentLat,
-        peak_lon: incidentLon,
-        peak_h_m: Math.round(incidentH),
-        peak_t_s: Math.round(peakT),
-        fall_duration_s: Math.round(fallTimeS),
-        // Distinguishes "true no-GPS log" from "operator overrode with manual home"
-        manual_home: forceManualHome,
+        fall_time_s:      +fallTimeS.toFixed(1),
+        descent_rate_ms:  +descentRate.toFixed(2),
+        wind_drift_m:     Math.round(windDriftM),
+        // Legacy aliases used by AI prompt and result card
+        peak_lat:         incidentLat,
+        peak_lon:         incidentLon,
+        peak_h_m:         Math.round(incidentH),
+        peak_t_s:         Math.round(t[lastIdx] || 0),
+        fall_duration_s:  Math.round(fallTimeS),
       };
     }
 
@@ -2923,13 +2889,11 @@
           if (startIdx < 0) startIdx = 0;
         }
 
-        const peakIdx = h.length >= 10 ? findLastPeakBeforeDescent(h) : t.length - 1;
-        const endIdx  = Math.max(startIdx, Math.min(peakIdx, t.length - 1));
-
+        // Integrate to END of telemetry (matches computeDeadReckoning)
         let curLat = baseLat, curLon = baseLon;
         drPoints.push({ lat: curLat, lon: curLon, h: h[startIdx] || 0 });
 
-        for (let i = startIdx; i < endIdx && i < t.length - 1; i++) {
+        for (let i = startIdx; i < t.length - 1; i++) {
           const dt = t[i + 1] - t[i];
           if (dt <= 0 || dt > 10) continue;
           const hdgRad = ((hdg[i] || 0) * Math.PI) / 180;
@@ -2942,11 +2906,12 @@
             drPoints.push({ lat: curLat, lon: curLon, h: h[i + 1] || 0 });
           }
         }
-        // Always include the incident point explicitly
-        const iLat = dr.incident_lat || dr.peak_lat || curLat;
-        const iLon = dr.incident_lon || dr.peak_lon || curLon;
-        const iH   = dr.incident_h_m || dr.peak_h_m || 0;
-        drPoints.push({ lat: iLat, lon: iLon, h: iH });
+        // Always end at the incident point (= end of telemetry)
+        drPoints.push({
+          lat: dr.incident_lat || curLat,
+          lon: dr.incident_lon || curLon,
+          h:   dr.incident_h_m || 0,
+        });
       }
 
       // ── Key positions ─────────────────────────────────────────────────
