@@ -456,6 +456,102 @@
   }
   .chart-full { grid-column: 1 / -1; }
 
+  /* ── RESULTS TABS ── */
+  .results-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+  }
+  .rtab {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 18px;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: -2px;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .rtab:hover { color: var(--text); background: var(--bg2); }
+  .rtab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--bg2); }
+  .rtab-panel { display: none; }
+  .rtab-panel.active { display: block; }
+
+  /* ── PREDICTION TAB ── */
+  .pred-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .pred-field { display: flex; flex-direction: column; gap: 5px; }
+  .pred-field label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--text-dim); }
+  .pred-field input, .pred-field select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .pred-field input:focus, .pred-field select:focus { border-color: var(--accent); }
+  .pred-field select option { background: var(--bg3); }
+  .pred-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .pred-chart-full { grid-column: 1 / -1; }
+  .pred-run-row { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; }
+  .pred-loader { display:none; align-items:center; gap:10px; color:var(--text-dim); font-size:13px; }
+  .pred-loader.show { display:flex; }
+  .pred-loader .spinner { width:18px; height:18px; border:2px solid var(--border);
+    border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  .pred-result { display:none; }
+  .pred-result.show { display:block; }
+  .pred-coords-card {
+    background: linear-gradient(135deg, #0f1a1e 0%, var(--bg2) 100%);
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 14px;
+  }
+  .pred-coords-card .pc-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--accent); margin-bottom: 8px;
+  }
+  .pred-coords-card .pc-coords {
+    font-family: monospace; font-size: 20px; font-weight: 800;
+    color: var(--text); margin-bottom: 10px;
+  }
+  .pred-coords-card a.pc-maps {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent); color: #000; font-size: 12px; font-weight: 700;
+    padding: 6px 14px; border-radius: 20px; text-decoration: none;
+    transition: opacity .15s;
+  }
+  .pred-coords-card a.pc-maps:hover { opacity: .85; }
+  .pred-explanation {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; font-size: 13px; line-height: 1.7; color: var(--text);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .pred-explanation strong { color: var(--accent); }
+  @media (max-width: 640px) {
+    .pred-form { grid-template-columns: 1fr 1fr; }
+    .pred-charts-grid { grid-template-columns: 1fr; }
+    .pred-chart-full { grid-column: 1; }
+  }
+
   /* ── EVENTS TABLE ── */
   .events-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .events-table th {
@@ -630,129 +726,244 @@
   <!-- RESULTS -->
   <div id="results">
 
-    <!-- MESSENGER -->
-    <div class="messenger-block" style="margin-top:20px">
-      <span class="tag">📱 Текст для месенджера</span>
-      <button class="copy-btn" id="copyBtn" onclick="copyMessenger()">Копіювати</button>
-      <div class="messenger-text" id="messengerText"></div>
+    <!-- ── RESULTS TABS ─────────────────────────────────────────── -->
+    <div class="results-tabs" style="margin-top:20px">
+      <button class="rtab active" id="rtabAnalysis" onclick="switchTab('tabAnalysis')">📊 Аналіз польоту</button>
+      <button class="rtab"        id="rtabPredict"  onclick="switchTab('tabPredict')">🎯 Пошук місця</button>
     </div>
 
-    <!-- STATS -->
-    <div class="stats-grid" id="statsGrid"></div>
+    <!-- ══════════════════ TAB 1 — ANALYSIS ══════════════════════ -->
+    <div id="tabAnalysis" class="rtab-panel active">
 
-    <!-- COORDINATES -->
-    <div id="coordBlock" style="display:none;margin-bottom:14px">
-      <div class="coord-row">
-        <div class="coord-card" id="coordHome"></div>
-        <div class="coord-card" id="coordFinal"></div>
+      <!-- MESSENGER -->
+      <div class="messenger-block">
+        <span class="tag">📱 Текст для месенджера</span>
+        <button class="copy-btn" id="copyBtn" onclick="copyMessenger()">Копіювати</button>
+        <div class="messenger-text" id="messengerText"></div>
       </div>
-    </div>
 
-    <!-- EVENTS -->
-    <div class="section">
-      <div class="section-header" onclick="toggleSection(this)">
-        <span class="icon">⚡</span>
-        <h2>Хронологія ключових подій</h2>
-        <span class="chevron">▾</span>
-      </div>
-      <div class="section-body">
-        <div class="table-scroll">
-          <table class="events-table">
-            <thead><tr><th>Час (с)</th><th>UTC+2</th><th>Тип</th><th>Опис</th></tr></thead>
-            <tbody id="eventsBody"></tbody>
-          </table>
+      <!-- AI REPORT (moved here, below messenger) -->
+      <div class="section" style="margin-top:14px">
+        <div class="section-header collapsed" onclick="toggleSection(this)">
+          <span class="icon">📄</span>
+          <h2>Повний аналітичний звіт</h2>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body hidden">
+          <div class="report-text" id="reportText"></div>
         </div>
       </div>
-    </div>
 
-    <!-- CHARTS -->
-    <div class="section">
-      <div class="section-header" onclick="toggleSection(this)">
-        <span class="icon">📈</span>
-        <h2>Графіки телеметрії</h2>
-        <span class="chevron">▾</span>
-      </div>
-      <div class="section-body">
-        <div class="charts-grid" id="chartsGrid">
+      <!-- STATS -->
+      <div class="stats-grid" id="statsGrid" style="margin-top:14px"></div>
 
-          <!-- ── Рух ─────────────────────────────────────────────── -->
-          <div class="chart-group-label">Рух</div>
-          <div class="chart-wrap">
-            <div class="chart-title">Висота над точкою зльоту, м</div>
-            <div id="chartHeight" style="height:220px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Горизонтальна швидкість, м/с</div>
-            <div id="chartSpeed" style="height:220px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Дистанція від точки зльоту, м</div>
-            <div id="chartDist" style="height:220px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Вертикальна швидкість, м/с</div>
-            <div id="chartVspeed" style="height:220px"></div>
-          </div>
-
-          <!-- ── Навігація ──────────────────────────────────────── -->
-          <div class="chart-group-label">Навігація</div>
-          <div class="chart-wrap chart-full">
-            <div class="chart-title">Якість сигналу GNSS — рівень (0–5) та кількість супутників</div>
-            <div id="chartGnss" style="height:220px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Компас — курс (°) та аномалії</div>
-            <div id="chartCompass" style="height:220px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Кількість супутників GPS</div>
-            <div id="chartSats" style="height:220px"></div>
-          </div>
-
-          <!-- ── Живлення ───────────────────────────────────────── -->
-          <div class="chart-group-label">Живлення</div>
-          <div class="chart-wrap">
-            <div class="chart-title">Заряд акумулятора, %</div>
-            <div id="chartBat" style="height:220px"></div>
-          </div>
-          <div class="chart-wrap">
-            <div class="chart-title">Напруга акумулятора, В</div>
-            <div id="chartVolt" style="height:220px"></div>
-          </div>
-
-          <!-- ── Орієнтація ─────────────────────────────────────── -->
-          <div class="chart-group-label">Орієнтація</div>
-          <div class="chart-wrap chart-full">
-            <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
-            <div id="chartAttitude" style="height:200px"></div>
-          </div>
-
-          <!-- ── Режим / Карта ──────────────────────────────────── -->
-          <div class="chart-group-label">Режим та маршрут</div>
-          <div class="chart-wrap chart-full">
-            <div class="chart-title">Режим польоту по часу</div>
-            <div id="chartState" style="height:160px"></div>
-          </div>
-          <div class="chart-wrap chart-full">
-            <div class="chart-title">Траєкторія польоту</div>
-            <div id="chartMap" style="height:380px"></div>
-          </div>
-
+      <!-- COORDINATES -->
+      <div id="coordBlock" style="display:none;margin-bottom:14px">
+        <div class="coord-row">
+          <div class="coord-card" id="coordHome"></div>
+          <div class="coord-card" id="coordFinal"></div>
         </div>
       </div>
-    </div>
 
-    <!-- AI REPORT -->
-    <div class="section">
-      <div class="section-header" onclick="toggleSection(this)">
-        <span class="icon">📄</span>
-        <h2>Повний аналітичний звіт</h2>
-        <span class="chevron">▾</span>
+      <!-- EVENTS -->
+      <div class="section">
+        <div class="section-header" onclick="toggleSection(this)">
+          <span class="icon">⚡</span>
+          <h2>Хронологія ключових подій</h2>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="table-scroll">
+            <table class="events-table">
+              <thead><tr><th>Час (с)</th><th>UTC+2</th><th>Тип</th><th>Опис</th></tr></thead>
+              <tbody id="eventsBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
-      <div class="section-body">
-        <div class="report-text" id="reportText"></div>
+
+      <!-- CHARTS -->
+      <div class="section">
+        <div class="section-header" onclick="toggleSection(this)">
+          <span class="icon">📈</span>
+          <h2>Графіки телеметрії</h2>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="charts-grid" id="chartsGrid">
+
+            <!-- ── Рух ─────────────────────────────────────────── -->
+            <div class="chart-group-label">Рух</div>
+            <div class="chart-wrap">
+              <div class="chart-title">Висота над точкою зльоту, м</div>
+              <div id="chartHeight" style="height:220px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Горизонтальна швидкість, м/с</div>
+              <div id="chartSpeed" style="height:220px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Дистанція від точки зльоту, м</div>
+              <div id="chartDist" style="height:220px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Вертикальна швидкість, м/с</div>
+              <div id="chartVspeed" style="height:220px"></div>
+            </div>
+
+            <!-- ── Навігація ──────────────────────────────────── -->
+            <div class="chart-group-label">Навігація</div>
+            <div class="chart-wrap chart-full">
+              <div class="chart-title">Якість сигналу GNSS — рівень (0–5) та кількість супутників</div>
+              <div id="chartGnss" style="height:220px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Компас — курс (°) та аномалії</div>
+              <div id="chartCompass" style="height:220px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Кількість супутників GPS</div>
+              <div id="chartSats" style="height:220px"></div>
+            </div>
+
+            <!-- ── Живлення ───────────────────────────────────── -->
+            <div class="chart-group-label">Живлення</div>
+            <div class="chart-wrap">
+              <div class="chart-title">Заряд акумулятора, %</div>
+              <div id="chartBat" style="height:220px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Напруга акумулятора, В</div>
+              <div id="chartVolt" style="height:220px"></div>
+            </div>
+
+            <!-- ── Орієнтація ─────────────────────────────────── -->
+            <div class="chart-group-label">Орієнтація</div>
+            <div class="chart-wrap chart-full">
+              <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
+              <div id="chartAttitude" style="height:200px"></div>
+            </div>
+
+            <!-- ── Режим / Карта ──────────────────────────────── -->
+            <div class="chart-group-label">Режим та маршрут</div>
+            <div class="chart-wrap chart-full">
+              <div class="chart-title">Режим польоту по часу</div>
+              <div id="chartState" style="height:160px"></div>
+            </div>
+            <div class="chart-wrap chart-full">
+              <div class="chart-title">Траєкторія польоту</div>
+              <div id="chartMap" style="height:380px"></div>
+            </div>
+
+          </div>
+        </div>
       </div>
-    </div>
+
+    </div><!-- /tabAnalysis -->
+
+    <!-- ══════════════════ TAB 2 — PREDICTION ════════════════════ -->
+    <div id="tabPredict" class="rtab-panel">
+
+      <!-- Input form -->
+      <div class="section">
+        <div class="section-header" onclick="toggleSection(this)">
+          <span class="icon">📍</span>
+          <h2>Вхідні дані для розрахунку</h2>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="pred-form">
+            <div class="pred-field">
+              <label>Широта стартової точки</label>
+              <input type="number" id="predHomeLat" step="0.0000001" placeholder="48.1234567">
+            </div>
+            <div class="pred-field">
+              <label>Довгота стартової точки</label>
+              <input type="number" id="predHomeLon" step="0.0000001" placeholder="35.9876543">
+            </div>
+            <div class="pred-field">
+              <label>Напрямок вітру (звідки, °)</label>
+              <div style="display:flex;gap:6px">
+                <select id="predWindPreset" onchange="windPresetChange()" style="flex:1">
+                  <option value="">— обрати —</option>
+                  <option value="0">Північ (0°)</option>
+                  <option value="45">Пн-Схід (45°)</option>
+                  <option value="90">Схід (90°)</option>
+                  <option value="135">Пд-Схід (135°)</option>
+                  <option value="180">Південь (180°)</option>
+                  <option value="225">Пд-Захід (225°)</option>
+                  <option value="270">Захід (270°)</option>
+                  <option value="315">Пн-Захід (315°)</option>
+                  <option value="custom">Вручну…</option>
+                </select>
+                <input type="number" id="predWindDir" min="0" max="360" placeholder="0–360" style="width:80px">
+              </div>
+            </div>
+            <div class="pred-field">
+              <label>Швидкість вітру, м/с</label>
+              <input type="number" id="predWindSpeed" min="0" max="50" step="0.1" placeholder="напр. 5">
+            </div>
+            <div class="pred-field" style="grid-column:1/-1">
+              <label>Використати дані з аналізу</label>
+              <button class="btn btn-secondary" style="width:fit-content;font-size:12px"
+                onclick="fillPredFromAnalysis()">↓ Заповнити координати зі звіту</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 mini-charts -->
+      <div class="section">
+        <div class="section-header" onclick="toggleSection(this)">
+          <span class="icon">📈</span>
+          <h2>Телеметрія для аналізу (остання фаза польоту)</h2>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="pred-charts-grid">
+            <div class="chart-wrap">
+              <div class="chart-title">Висота над точкою зльоту, м</div>
+              <div id="predChartHeight" style="height:200px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Горизонтальна швидкість, м/с</div>
+              <div id="predChartSpeed" style="height:200px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Вертикальна швидкість, м/с</div>
+              <div id="predChartVspeed" style="height:200px"></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-title">Компас — курс (°) та аномалії</div>
+              <div id="predChartCompass" style="height:200px"></div>
+            </div>
+            <div class="chart-wrap pred-chart-full">
+              <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
+              <div id="predChartAttitude" style="height:200px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Run button + loader -->
+      <div class="pred-run-row">
+        <button class="btn btn-primary" id="predBtn" onclick="runPrediction()">
+          🎯 Розрахувати точку приземлення (ШІ)
+        </button>
+        <div class="pred-loader" id="predLoader">
+          <div class="spinner"></div>
+          <span>ШІ розраховує точку… ~15–30 с</span>
+        </div>
+      </div>
+      <div class="error-box" id="predErrorBox"></div>
+
+      <!-- Result -->
+      <div class="pred-result" id="predResult">
+        <div class="pred-coords-card" id="predCoordsCard"></div>
+        <div class="pred-explanation" id="predExplanation"></div>
+      </div>
+
+    </div><!-- /tabPredict -->
 
   </div><!-- /results -->
 </div><!-- /container -->
@@ -1174,6 +1385,7 @@ function renderCoords(s) {
       ${timeHtml}
       <div class="coord-val">${latF}, ${lonF}</div>
       <a class="map-link" href="${gmUrl}" target="_blank" rel="noopener">Відкрити в Google Maps ↗</a>`;
+    el._lat = lat; el._lon = lon;  // store for prediction tab auto-fill
   }
 
   coordCard('coordHome',  'Домашня точка (зліт)',     s.home_lat,  s.home_lon,  takeoffTime);
@@ -1539,6 +1751,8 @@ function showError(msg) {
 function resetAll() {
   csvText = ''; rawCsvText = ''; metrics = {}; fileName = '';
   missionType = null; firmware1001 = null; antispoof = null;
+  predChartsRendered = false;
+  switchTab('tabAnalysis');
   fileInput.value = '';
   document.getElementById('fileInfo').classList.remove('visible');
   document.getElementById('formatBadge').textContent = '';
@@ -1563,6 +1777,199 @@ function fmtSize(bytes) {
   if (bytes < 1024) return bytes + ' Б';
   if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' КБ';
   return (bytes/1048576).toFixed(2) + ' МБ';
+}
+
+// ── TABS ─────────────────────────────────────────────────────────
+let predChartsRendered = false;
+
+function switchTab(id) {
+  ['tabAnalysis','tabPredict'].forEach(tid => {
+    document.getElementById(tid).classList.toggle('active', tid === id);
+  });
+  ['rtabAnalysis','rtabPredict'].forEach(bid => {
+    const panel = bid.replace('rtab','tab');
+    document.getElementById(bid).classList.toggle('active', panel === id);
+  });
+  // Render prediction charts the first time the tab is opened
+  if (id === 'tabPredict' && !predChartsRendered && metrics && metrics.t && metrics.t.length) {
+    renderPredictionCharts(metrics);
+    predChartsRendered = true;
+    // Pre-fill home coords if available
+    const homeEl = document.getElementById('coordHome');
+    if (homeEl && homeEl._lat) {
+      document.getElementById('predHomeLat').value = homeEl._lat;
+      document.getElementById('predHomeLon').value = homeEl._lon;
+    }
+  }
+}
+
+function fillPredFromAnalysis() {
+  if (!metrics || !metrics.lat) return;
+  // Use first valid lat/lon as home
+  for (let i = 0; i < metrics.lat.length; i++) {
+    if (Math.abs(metrics.lat[i]) > 0.01 && Math.abs(metrics.lon[i]) > 0.01) {
+      document.getElementById('predHomeLat').value = metrics.lat[i].toFixed(7);
+      document.getElementById('predHomeLon').value = metrics.lon[i].toFixed(7);
+      break;
+    }
+  }
+}
+
+function windPresetChange() {
+  const sel = document.getElementById('predWindPreset');
+  if (sel.value && sel.value !== 'custom') {
+    document.getElementById('predWindDir').value = sel.value;
+  }
+}
+
+// ── PREDICTION CHARTS ─────────────────────────────────────────────
+function renderPredictionCharts(m) {
+  const t   = m.t;
+  const CFG = { displayModeBar: false, responsive: true };
+
+  // Thin line style shared by all pred charts
+  const pl = (extra) => Object.assign({}, {
+    paper_bgcolor:'#1a1d24', plot_bgcolor:'#1a1d24',
+    font:{ color:'#c8cdd6', size:11 },
+    margin:{l:46,r:12,t:8,b:36},
+    xaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
+            title:{text:'час (с)',font:{size:10}}, tickfont:{size:10} },
+    yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a', tickfont:{size:10} },
+    hoverlabel:{ bgcolor:'#111318', bordercolor:'#2a2f3a',
+                 font:{color:'#c8cdd6', family:'Arial,sans-serif', size:12} },
+    showlegend: false,
+  }, extra);
+
+  // 1. Height
+  Plotly.newPlot('predChartHeight', [{
+    x:t, y:m.h, type:'scatter', mode:'lines',
+    line:{color:'#00d4aa', width:2}, fill:'tozeroy', fillcolor:'rgba(0,212,170,.08)'
+  }], pl({ yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
+                   title:{text:'м', font:{size:10}}, tickfont:{size:10} } }), CFG);
+
+  // 2. Horizontal speed
+  Plotly.newPlot('predChartSpeed', [{
+    x:t, y:m.spd_ms, type:'scatter', mode:'lines', line:{color:'#0099ff',width:2}
+  }], pl({ yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
+                   title:{text:'м/с',font:{size:10}}, tickfont:{size:10} } }), CFG);
+
+  // 3. Vertical speed
+  Plotly.newPlot('predChartVspeed', [{
+    x:t, y:m.z_ms, type:'scatter', mode:'lines',
+    line:{color:'#f59e0b',width:2}
+  }], pl({ yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
+                   title:{text:'м/с',font:{size:10}}, tickfont:{size:10} } }), CFG);
+
+  // 4. Compass with anomaly markers (same logic as main chart)
+  const compassData = [{
+    x:t, y:m.hdg, type:'scatter', mode:'lines', name:'Курс',
+    line:{color:'#a78bfa',width:2}
+  }];
+  // Compute jumps for markers
+  const jumpX=[], jumpY=[];
+  for (let i=1;i<m.hdg.length;i++){
+    let d=Math.abs(m.hdg[i]-m.hdg[i-1]); if(d>180) d=360-d;
+    if(d>60){jumpX.push(t[i]);jumpY.push(m.hdg[i]);}
+  }
+  if (jumpX.length) compassData.push({
+    x:jumpX, y:jumpY, mode:'markers', name:'Аномалія',
+    marker:{color:'#ff3355', size:8, symbol:'x'}
+  });
+  Plotly.newPlot('predChartCompass', compassData, pl({
+    showlegend: jumpX.length > 0,
+    legend:{bgcolor:'rgba(0,0,0,0)',font:{color:'#c8cdd6',size:10}},
+    yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
+            title:{text:'°',font:{size:10}}, tickfont:{size:10},
+            tickvals:[0,45,90,135,180,225,270,315,360],
+            ticktext:['N','NE','E','SE','S','SW','W','NW','N'] }
+  }), CFG);
+
+  // 5. Pitch / Roll
+  Plotly.newPlot('predChartAttitude', [
+    { x:t, y:m.pitch, type:'scatter', mode:'lines', name:'Pitch', line:{color:'#f97316',width:2} },
+    { x:t, y:m.roll,  type:'scatter', mode:'lines', name:'Roll',  line:{color:'#8b5cf6',width:2} },
+  ], pl({
+    showlegend:true,
+    legend:{bgcolor:'rgba(0,0,0,0)',font:{color:'#c8cdd6',size:10}},
+    yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
+            title:{text:'°',font:{size:10}}, tickfont:{size:10} }
+  }), CFG);
+}
+
+// ── RUN PREDICTION ────────────────────────────────────────────────
+async function runPrediction() {
+  const errBox = document.getElementById('predErrorBox');
+  errBox.textContent = '';
+  errBox.classList.remove('visible');
+
+  if (!metrics || !metrics.t || !metrics.t.length) {
+    errBox.textContent = 'Спочатку завантажте та проаналізуйте лог-файл.';
+    errBox.classList.add('visible'); return;
+  }
+  const homeLat  = parseFloat(document.getElementById('predHomeLat').value);
+  const homeLon  = parseFloat(document.getElementById('predHomeLon').value);
+  const windDir  = parseFloat(document.getElementById('predWindDir').value  || 0);
+  const windSpd  = parseFloat(document.getElementById('predWindSpeed').value || 0);
+  if (!homeLat || !homeLon) {
+    errBox.textContent = 'Введіть координати стартової точки (або натисніть «Заповнити зі звіту»).';
+    errBox.classList.add('visible'); return;
+  }
+
+  // Send full telemetry — AI needs complete picture to find last valid GPS and descent profile
+  const lastData = {
+    t:      metrics.t,
+    h:      metrics.h,
+    spd_ms: metrics.spd_ms,
+    z_ms:   metrics.z_ms,
+    hdg:    metrics.hdg,
+    pitch:  metrics.pitch,
+    roll:   metrics.roll,
+    lat:    metrics.lat,
+    lon:    metrics.lon,
+  };
+
+  document.getElementById('predLoader').classList.add('show');
+  document.getElementById('predBtn').disabled = true;
+  document.getElementById('predResult').classList.remove('show');
+
+  try {
+    const res  = await fetch('/predict', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ last_data: lastData, home_lat: homeLat, home_lon: homeLon,
+                             wind_dir_deg: windDir, wind_speed_ms: windSpd, filename: fileName })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Render result
+    const card = document.getElementById('predCoordsCard');
+    if (data.pred_lat && data.pred_lon) {
+      const latF = data.pred_lat.toFixed(7), lonF = data.pred_lon.toFixed(7);
+      const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
+      card.innerHTML = `
+        <div class="pc-label">🎯 Розрахована точка приземлення</div>
+        <div class="pc-coords">${latF}, ${lonF}</div>
+        <a class="pc-maps" href="${gmUrl}" target="_blank" rel="noopener">
+          Відкрити в Google Maps ↗
+        </a>`;
+    } else {
+      card.innerHTML = `<div class="pc-label">⚠ Координати не вдалося витягти автоматично — дивіться пояснення</div>`;
+    }
+
+    // Render markdown-ish explanation
+    const expl = document.getElementById('predExplanation');
+    expl.innerHTML = (data.explanation || '')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+
+    document.getElementById('predResult').classList.add('show');
+  } catch(e) {
+    errBox.textContent = 'Помилка: ' + e.message;
+    errBox.classList.add('visible');
+  } finally {
+    document.getElementById('predLoader').classList.remove('show');
+    document.getElementById('predBtn').disabled = false;
+  }
 }
 
 // ── PWA: Service Worker registration ─────────────────────────────
