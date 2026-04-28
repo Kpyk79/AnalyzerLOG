@@ -2483,36 +2483,23 @@
     //             Wind drift  = V_wind × t_fall  in the downwind direction.
     //             Landing point = incident_point + wind_drift_vector.
 
-    // Returns index of the last height peak that precedes the final descent.
+    // Returns the index of the global height maximum (= incident point where
+    // the drone began its uncontrolled descent). Ignores the last 2% of samples
+    // to avoid noise spikes right at the moment of crash/cutoff.
     function findLastPeakBeforeDescent(h) {
       const n = h.length;
-      if (n < 10) return 0;
+      if (n < 5) return 0;
 
-      // Smooth with a 10-sample window to remove sensor jitter
-      const W = 10;
-      const sm = h.map((_, i) => {
-        const lo = Math.max(0, i - W), hi = Math.min(n - 1, i + W);
-        let s = 0;
-        for (let j = lo; j <= hi; j++) s += (h[j] || 0);
-        return s / (hi - lo + 1);
-      });
-
-      // Minimum height in the final 30 % of the flight (the "landing zone")
-      const tailStart = Math.floor(n * 0.7);
-      let minTail = Infinity;
-      for (let i = tailStart; i < n; i++) minTail = Math.min(minTail, sm[i]);
-
-      // Scan backwards from 80 % to 20 % of flight to find the last local max
-      // that sits at least 10 m above the tail minimum.
-      const scanEnd = Math.floor(n * 0.8);
-      const scanStart = Math.floor(n * 0.2);
-      for (let i = scanEnd; i >= scanStart; i--) {
-        const isPeak = sm[i] >= sm[Math.max(0, i - 1)] && sm[i] >= sm[Math.min(n - 1, i + 1)];
-        if (isPeak && sm[i] - minTail >= 10) return i;
+      // Search the whole flight (skip the very last 2% — landing tail noise)
+      const searchEnd = Math.max(1, Math.floor(n * 0.98));
+      let maxVal = -Infinity, maxIdx = 0;
+      for (let i = 0; i < searchEnd; i++) {
+        if ((h[i] || 0) > maxVal) {
+          maxVal = h[i];
+          maxIdx = i;
+        }
       }
-
-      // Fallback: midpoint
-      return Math.floor(n / 2);
+      return maxIdx;
     }
 
     function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs) {
