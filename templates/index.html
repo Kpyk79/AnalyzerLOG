@@ -243,6 +243,15 @@
       display: inline-flex;
     }
 
+    .dl-btn.kml {
+      border-color: rgba(0, 212, 170, .35);
+      background:   rgba(0, 212, 170, .08);
+      color: var(--accent);
+    }
+    .dl-btn.kml:hover {
+      background: rgba(0, 212, 170, .18);
+    }
+
     /* ── MISSION TYPE BUTTONS ── */
     .mission-row {
       margin-top: 16px;
@@ -1137,6 +1146,9 @@
           <button class="dl-btn" id="dlNormBtn" onclick="downloadNormalized()">
             ⬇ Завантажити нормалізований CSV
           </button>
+          <button class="dl-btn kml" id="dlKmlBtn" onclick="generateAndDownloadKML()">
+            📍 Завантажити KML маршрут
+          </button>
         </div>
       </div>
     </div>
@@ -1443,6 +1455,13 @@
         <!-- Result -->
         <div class="pred-result" id="predResult">
           <div class="pred-coords-card" id="predCoordsCard"></div>
+          <div style="margin-top:10px">
+            <button class="dl-btn kml" id="kmlFromPred"
+                    onclick="generateAndDownloadKML()"
+                    style="display:none">
+              📍 Завантажити KML (маршрут + прогноз)
+            </button>
+          </div>
           <div class="pred-explanation" id="predExplanation"></div>
         </div>
 
@@ -1457,6 +1476,8 @@
     let rawCsvText = '';     // original file bytes — used for comma→; download
     let metrics = {};
     let fileName = '';
+    let _lastKmlDr   = null;  // cached DR result from last prediction run
+    let _lastKmlPred = null;  // cached { lat, lon } predicted landing
     let missionType = null;   // 'ВТРАТА' | 'ПОШКОДЖЕННЯ'
     let firmware1001 = null;   // 'є' | 'немає'
     let antispoof = null;   // 'активовано' | 'не активовано' | null
@@ -1575,6 +1596,7 @@
         const summary = buildSummary(metrics);
 
         document.getElementById('results').classList.add('visible');
+        document.getElementById('dlKmlBtn').classList.add('visible');
         renderStats(summary);
         renderCoords(summary);
         renderEvents(metrics, summary);
@@ -2285,6 +2307,7 @@
       document.getElementById('formatBadge').textContent = '';
       document.getElementById('formatBadge').className = 'badge-format';
       document.getElementById('dlNormBtn').classList.remove('visible');
+      document.getElementById('dlKmlBtn').classList.remove('visible');
       document.getElementById('btnLoss').className = 'mission-btn';
       document.getElementById('btnDamage').className = 'mission-btn';
       document.getElementById('btnHas1001').className = 'mission-btn';
@@ -2660,6 +2683,7 @@
 
       // ── Pre-compute dead reckoning in browser (integrates full telemetry) ──
       const dr = computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd);
+      _lastKmlDr = dr;   // cache for KML export
 
       // ── Flight summary: last-moment values + post-GPS statistics ──
       const last = (arr) => arr[arr.length - 1] || 0;
@@ -2718,6 +2742,8 @@
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
+        _lastKmlPred = (data.pred_lat && data.pred_lon)
+          ? { lat: data.pred_lat, lon: data.pred_lon } : null;
 
         // Render result
         const card = document.getElementById('predCoordsCard');
@@ -2787,6 +2813,7 @@
           .replace(/\n/g, '<br>');
 
         document.getElementById('predResult').classList.add('show');
+        document.getElementById('kmlFromPred').style.display = 'inline-flex';
       } catch (e) {
         errBox.textContent = 'Помилка: ' + e.message;
         errBox.classList.add('visible');
@@ -2794,6 +2821,242 @@
         document.getElementById('predLoader').classList.remove('show');
         document.getElementById('predBtn').disabled = false;
       }
+    }
+
+    // ── KML EXPORT ────────────────────────────────────────────────────
+    // Generates a Google Earth / Maps KML with:
+    //   • GPS track       (teal solid line)   — only valid GPS waypoints
+    //   • DR track        (orange dashed)     — dead reckoning Phase 1 (active flight)
+    //   • Fall vector     (blue dashed)       — incident point → predicted landing
+    //   • Key placemarks  — home, last GPS, incident (peak), predicted landing
+    function generateAndDownloadKML() {
+      if (!metrics || !metrics.t || !metrics.t.length) {
+        alert('Спочатку завантажте та проаналізуйте лог-файл.');
+        return;
+      }
+
+      // Determine home coords: from prediction input or first valid GPS
+      let homeLat = null, homeLon = null;
+      const hcEl = document.getElementById('predHomeCoords');
+      if (hcEl && hcEl.value) {
+        const hc = parseLatLon(hcEl.value);
+        if (hc) { homeLat = hc.lat; homeLon = hc.lon; }
+      }
+      if (homeLat === null) {
+        for (let i = 0; i < metrics.lat.length; i++) {
+          if (Math.abs(metrics.lat[i]) > 0.01 && Math.abs(metrics.lon[i]) > 0.01) {
+            homeLat = metrics.lat[i]; homeLon = metrics.lon[i]; break;
+          }
+        }
+      }
+
+      const windDir = parseFloat(document.getElementById('predWindDir').value  || 0);
+      const windSpd = parseFloat(document.getElementById('predWindSpeed').value || 0);
+
+      // Use cached DR if available, otherwise compute fresh
+      const dr = _lastKmlDr ||
+        (homeLat !== null
+          ? computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd)
+          : null);
+
+      const kml = buildFlightKML(metrics, dr, _lastKmlPred, homeLat, homeLon, fileName);
+      const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = (fileName || 'flight').replace(/\.csv$/i, '_route.kml');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function buildFlightKML(m, dr, pred, homeLat, homeLon, filename) {
+      // ── Helpers ──────────────────────────────────────────────────────
+      const esc  = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const coord = (lat, lon, h = 0) =>
+        `${(+lon).toFixed(7)},${(+lat).toFixed(7)},${(+h).toFixed(1)}`;
+      const coordList = (pts) =>
+        pts.map(p => coord(p.lat, p.lon, p.h || 0)).join('\n          ');
+
+      // ── Collect valid GPS waypoints ───────────────────────────────────
+      const gpsPoints = [];
+      for (let i = 0; i < m.lat.length; i++) {
+        if (Math.abs(m.lat[i]) > 0.01 && Math.abs(m.lon[i]) > 0.01) {
+          gpsPoints.push({ lat: m.lat[i], lon: m.lon[i], h: m.h[i] || 0, t: m.t[i] });
+        }
+      }
+
+      // ── Build DR (Phase 1) waypoints: last GPS → incident peak ────────
+      const drPoints = [];
+      if (dr && (dr.last_valid_lat || homeLat !== null)) {
+        const { t, hdg, spd_ms, h } = m;
+        let startIdx = dr.no_gps ? 0 : -1;
+        let baseLat = homeLat, baseLon = homeLon;
+
+        if (!dr.no_gps) {
+          for (let i = 0; i < m.lat.length; i++) {
+            if (Math.abs(m.lat[i]) > 0.01 && Math.abs(m.lon[i]) > 0.01) {
+              startIdx = i; baseLat = m.lat[i]; baseLon = m.lon[i];
+            }
+          }
+          if (startIdx < 0) startIdx = 0;
+        }
+
+        const peakIdx = h.length >= 10 ? findLastPeakBeforeDescent(h) : t.length - 1;
+        const endIdx  = Math.max(startIdx, Math.min(peakIdx, t.length - 1));
+
+        let curLat = baseLat, curLon = baseLon;
+        drPoints.push({ lat: curLat, lon: curLon, h: h[startIdx] || 0 });
+
+        for (let i = startIdx; i < endIdx && i < t.length - 1; i++) {
+          const dt = t[i + 1] - t[i];
+          if (dt <= 0 || dt > 10) continue;
+          const hdgRad = ((hdg[i] || 0) * Math.PI) / 180;
+          const spd    = Math.max(0, spd_ms[i] || 0);
+          const latRad = curLat * Math.PI / 180;
+          curLat += (spd * Math.cos(hdgRad) * dt) / 111320;
+          curLon += (spd * Math.sin(hdgRad) * dt) / (111320 * Math.cos(latRad));
+          // Every 5th sample (keeps file size manageable)
+          if ((i - startIdx) % 5 === 0) {
+            drPoints.push({ lat: curLat, lon: curLon, h: h[i + 1] || 0 });
+          }
+        }
+        // Always include the incident point explicitly
+        const iLat = dr.incident_lat || dr.peak_lat || curLat;
+        const iLon = dr.incident_lon || dr.peak_lon || curLon;
+        const iH   = dr.incident_h_m || dr.peak_h_m || 0;
+        drPoints.push({ lat: iLat, lon: iLon, h: iH });
+      }
+
+      // ── Key positions ─────────────────────────────────────────────────
+      const firstGps   = gpsPoints[0]  || null;
+      const lastGps    = gpsPoints[gpsPoints.length - 1] || null;
+      const incidentLat = dr ? (dr.incident_lat || dr.peak_lat) : null;
+      const incidentLon = dr ? (dr.incident_lon || dr.peak_lon) : null;
+      const incidentH   = dr ? (dr.incident_h_m || dr.peak_h_m || 0) : 0;
+      const fallTimeS   = dr ? (dr.fall_time_s   || dr.fall_duration_s || 0) : 0;
+      const windDriftM  = dr ? (dr.wind_drift_m  || 0) : 0;
+      const windToDeg   = dr ? (dr.wind_to_deg   || 0) : 0;
+      const predLat  = pred  ? pred.lat  : (dr ? dr.lat  : null);
+      const predLon  = pred  ? pred.lon  : (dr ? dr.lon  : null);
+      const predLabel = pred ? 'ШІ + фізична модель' : 'Тільки фізична модель (DR)';
+
+      // ── LineString builder ────────────────────────────────────────────
+      const lineStr = (name, desc, styleId, pts) => pts.length < 2 ? '' : `
+    <Placemark>
+      <name>${esc(name)}</name>
+      <description>${esc(desc)}</description>
+      <styleUrl>#${styleId}</styleUrl>
+      <LineString>
+        <tessellate>1</tessellate>
+        <altitudeMode>relativeToGround</altitudeMode>
+        <coordinates>
+          ${coordList(pts)}
+        </coordinates>
+      </LineString>
+    </Placemark>`;
+
+      // ── Placemark builder ─────────────────────────────────────────────
+      const pm = (name, desc, styleId, lat, lon, h = 0) => `
+    <Placemark>
+      <name>${esc(name)}</name>
+      <description>${esc(desc)}</description>
+      <styleUrl>#${styleId}</styleUrl>
+      <Point>
+        <altitudeMode>relativeToGround</altitudeMode>
+        <coordinates>${coord(lat, lon, h)}</coordinates>
+      </Point>
+    </Placemark>`;
+
+      // ── Assemble KML ──────────────────────────────────────────────────
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${esc(filename || 'Маршрут польоту')}</name>
+    <description>Маршрут DJI-польоту. Побудовано AnalyzerLOG.</description>
+
+    <!-- ═══ STYLES ═══════════════════════════════════════════ -->
+    <Style id="sGps">
+      <LineStyle><color>ff00d4aa</color><width>3</width></LineStyle>
+    </Style>
+    <Style id="sDr">
+      <LineStyle><color>ff0099ff</color><width>2</width></LineStyle>
+    </Style>
+    <Style id="sFall">
+      <LineStyle><color>ff3355ff</color><width>2</width></LineStyle>
+    </Style>
+    <Style id="iHome">
+      <IconStyle><scale>1.2</scale>
+        <Icon><href>http://maps.google.com/mapfiles/kml/paddle/grn-circle.png</href></Icon>
+      </IconStyle><LabelStyle><scale>0.9</scale></LabelStyle>
+    </Style>
+    <Style id="iLastGps">
+      <IconStyle><scale>1.0</scale>
+        <Icon><href>http://maps.google.com/mapfiles/kml/paddle/blu-circle.png</href></Icon>
+      </IconStyle><LabelStyle><scale>0.9</scale></LabelStyle>
+    </Style>
+    <Style id="iIncident">
+      <IconStyle><scale>1.1</scale>
+        <Icon><href>http://maps.google.com/mapfiles/kml/paddle/orange-circle.png</href></Icon>
+      </IconStyle><LabelStyle><scale>0.9</scale></LabelStyle>
+    </Style>
+    <Style id="iLanding">
+      <IconStyle><scale>1.3</scale>
+        <Icon><href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href></Icon>
+      </IconStyle><LabelStyle><scale>1.0</scale></LabelStyle>
+    </Style>
+
+    <!-- ═══ GPS TRACK ════════════════════════════════════════ -->
+    <Folder>
+      <name>📡 GPS-трек (${gpsPoints.length} точок)</name>
+      ${lineStr('GPS маршрут',
+        `${gpsPoints.length} точок GPS. Тривалість: ${m.t.length > 0 ? Math.round(m.t[m.t.length-1]) : 0}с`,
+        'sGps', gpsPoints)}
+    </Folder>
+
+    <!-- ═══ DEAD RECKONING TRACK ══════════════════════════════ -->
+    ${drPoints.length >= 2 ? `<Folder>
+      <name>🧮 Розрахунковий маршрут (DR, ${drPoints.length} точок)</name>
+      ${lineStr('Dead Reckoning — активний політ',
+        'Відновлений маршрут після втрати GPS до точки інциденту (піку висоти). Інтеграція курс × швидкість × dt.',
+        'sDr', drPoints)}
+    </Folder>` : ''}
+
+    <!-- ═══ FALL DRIFT VECTOR ══════════════════════════════════ -->
+    ${(incidentLat && predLat) ? `<Folder>
+      <name>💨 Вектор зносу при падінні</name>
+      ${lineStr('Знос вітром (фаза некерованого спуску)',
+        `Висота інциденту: ${incidentH}м | Час падіння: ${fallTimeS}с | Знос: ${windDriftM}м у напрямку ${windToDeg}°`,
+        'sFall', [
+          { lat: incidentLat, lon: incidentLon, h: incidentH },
+          { lat: predLat,     lon: predLon,     h: 0 }
+        ])}
+    </Folder>` : ''}
+
+    <!-- ═══ KEY PLACEMARKS ═════════════════════════════════════ -->
+    <Folder>
+      <name>📍 Ключові точки</name>
+      ${homeLat !== null ? pm(
+          '🏠 Стартова точка (зліт)',
+          `Координати: ${homeLat.toFixed(7)}, ${homeLon.toFixed(7)}`,
+          'iHome', homeLat, homeLon, 0) : ''}
+      ${lastGps ? pm(
+          '📡 Остання GPS-точка',
+          `t=${Math.round(lastGps.t)}с | Висота: ${lastGps.h.toFixed(1)}м\nКоординати: ${lastGps.lat.toFixed(7)}, ${lastGps.lon.toFixed(7)}`,
+          'iLastGps', lastGps.lat, lastGps.lon, lastGps.h) : ''}
+      ${incidentLat ? pm(
+          '⚠ Точка інциденту (пікова висота)',
+          `Висота: ${incidentH}м — тут починається некерований спуск\nКоординати: ${incidentLat.toFixed(7)}, ${incidentLon.toFixed(7)}`,
+          'iIncident', incidentLat, incidentLon, incidentH) : ''}
+      ${predLat ? pm(
+          '🎯 Розраховане місце приземлення',
+          `${predLabel}\nКоординати: ${predLat.toFixed(7)}, ${predLon.toFixed(7)}\nЗнос вітром: ${windDriftM}м у напрямку ${windToDeg}°`,
+          'iLanding', predLat, predLon, 0) : ''}
+    </Folder>
+
+  </Document>
+</kml>`;
     }
 
     // ── PWA: Service Worker registration ─────────────────────────────
