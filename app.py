@@ -605,6 +605,7 @@ def build_prediction_prompt(dr, fs, home_lat, home_lon,
     gps_lon        = dr.get("last_valid_lon",  home_lon)
     gps_t          = dr.get("last_valid_t",    None)
     no_gps         = dr.get("no_gps",          False)
+    manual_home    = dr.get("manual_home",     False)
     dr_dist_own    = dr.get("dist_own_m",      0)
     dr_dur_s       = dr.get("dr_duration_s",   0)
     incident_lat   = dr.get("incident_lat",    dr.get("peak_lat",  dr_lat))
@@ -631,7 +632,29 @@ def build_prediction_prompt(dr, fs, home_lat, home_lon,
     post_dur     = fs.get("post_gps_duration_s",    dr_dur_s)
 
     # ── GPS context block ──────────────────────────────────────────────────
-    if no_gps:
+    # Three distinct scenarios:
+    #   manual_home=True  → log may have GPS, but operator anchored with real coords
+    #                        (spoofed GPS, known real home, etc.)
+    #   no_gps=True (only) → entire flight had zero GPS fix
+    #   else               → GPS present in log; DR starts from last valid fix
+    if manual_home:
+        gps_block = (
+            f"Стартова точка задана оператором ВРУЧНУ: {home_lat:.7f}, {home_lon:.7f}\n"
+            f"  GPS-координати з логу ІГНОРУЮТЬСЯ (можливий спуфінг або помилковий сигнал).\n"
+            f"  Dead reckoning виконано від ручної точки старту через весь маршрут ({flight_s}с).\n"
+            f"  ★ Телеметрія курсу та швидкості з логу залишається валідною."
+        )
+        phase1_block = (
+            f"ФАЗА 1 — Активний політ від ручної стартової точки ({dr_dur_s}с, {dr_dist_own}м):\n"
+            f"  Інтегровано всю телеметрію від t=0 → пікова висота.\n"
+            f"  Середній курс: {post_avg_hdg:.1f}°, середня швидкість: {post_avg_spd:.2f} м/с\n"
+            f"  ★ Наземна швидкість — GPS-похідна (якщо GPS не спуфінгована на швидкість),\n"
+            f"    вітер вже закладено у вектор руху. Якщо вітер > швидкість дрона → рух назад.\n"
+            f"  Розрахована позиція інциденту: {incident_lat:.7f}, {incident_lon:.7f} "
+            f"(висота {incident_h}м)\n"
+            f"  ⚠ Похибка DR зростає зі збільшенням тривалості інтеграції від ручної точки."
+        )
+    elif no_gps:
         gps_block = (
             f"⚠ ПОЛІТ БЕЗ GPS — весь маршрут без позиціонування.\n"
             f"  Стартова точка вказана оператором вручну: {home_lat:.7f}, {home_lon:.7f}\n"
@@ -639,7 +662,7 @@ def build_prediction_prompt(dr, fs, home_lat, home_lon,
             f"Накопичена похибка може бути суттєвою."
         )
         phase1_block = (
-            f"ФАЗА 1 — Активний політ (без GPS, {dr_dur_s}с):\n"
+            f"ФАЗА 1 — Активний політ (лог без GPS, {dr_dur_s}с):\n"
             f"  Інтегровано весь маршрут від стартової точки → пікова висота.\n"
             f"  Середній курс: {post_avg_hdg:.1f}°, середня швидкість: {post_avg_spd:.2f} м/с\n"
             f"  Розрахована позиція інциденту: {incident_lat:.7f}, {incident_lon:.7f} "
@@ -768,7 +791,12 @@ def build_prediction_prompt(dr, fs, home_lat, home_lon,
    — Для важких платформ (Matrice 30/300) враховуй більший горизонтальний знос.
 
 4. СКОРИГУЙ і дай ОСТАТОЧНІ координати.
-   {"⚠ Польот без GPS — більший радіус невизначеності (300–600м)." if no_gps else ""}
+   {
+        "⚠ Ручна стартова точка — GPS з логу проігноровано. DR інтегровано від t=0, похибка зростає з тривалістю польоту. Радіус невизначеності 200–500м залежно від тривалості та умов."
+        if manual_home else
+        ("⚠ Лог без GPS — DR охоплює весь маршрут. Радіус невизначеності 300–600м."
+        if no_gps else "")
+    }
 
 Відповідай у такому форматі:
 
