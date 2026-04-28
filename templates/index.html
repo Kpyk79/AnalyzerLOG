@@ -873,13 +873,17 @@
         </div>
         <div class="section-body">
           <div class="pred-form">
-            <div class="pred-field">
-              <label>Широта стартової точки</label>
-              <input type="number" id="predHomeLat" step="0.0000001" placeholder="48.1234567">
-            </div>
-            <div class="pred-field">
-              <label>Довгота стартової точки</label>
-              <input type="number" id="predHomeLon" step="0.0000001" placeholder="35.9876543">
+            <div class="pred-field" style="grid-column:1/-1">
+              <label>Координати стартової точки</label>
+              <div style="position:relative">
+                <input type="text" id="predHomeCoords"
+                  placeholder="напр. 47.907815, 29.201759  або  47.907815 29.201759"
+                  oninput="parseHomeCoords(this.value)"
+                  style="width:100%;padding-right:110px">
+                <span id="predCoordsHint" style="
+                  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                  font-size:11px;color:var(--text-dim);pointer-events:none"></span>
+              </div>
             </div>
             <div class="pred-field">
               <label>Напрямок вітру (звідки, °)</label>
@@ -1753,6 +1757,10 @@ function resetAll() {
   missionType = null; firmware1001 = null; antispoof = null;
   predChartsRendered = false;
   switchTab('tabAnalysis');
+  const hc = document.getElementById('predHomeCoords');
+  if (hc) { hc.value = ''; hc.style.borderColor = ''; }
+  const ph = document.getElementById('predCoordsHint');
+  if (ph) ph.textContent = '';
   fileInput.value = '';
   document.getElementById('fileInfo').classList.remove('visible');
   document.getElementById('formatBadge').textContent = '';
@@ -1797,19 +1805,50 @@ function switchTab(id) {
     // Pre-fill home coords if available
     const homeEl = document.getElementById('coordHome');
     if (homeEl && homeEl._lat) {
-      document.getElementById('predHomeLat').value = homeEl._lat;
-      document.getElementById('predHomeLon').value = homeEl._lon;
+      const val = `${homeEl._lat.toFixed(7)}, ${homeEl._lon.toFixed(7)}`;
+      document.getElementById('predHomeCoords').value = val;
+      parseHomeCoords(val);
     }
+  }
+}
+
+// Parse free-form coord string → {lat, lon} or null
+function parseLatLon(str) {
+  if (!str) return null;
+  // Normalise: replace comma+spaces or just spaces as separator
+  const parts = str.trim().replace(/,\s*/g, ' ').split(/\s+/);
+  if (parts.length < 2) return null;
+  const lat = parseFloat(parts[0]), lon = parseFloat(parts[1]);
+  if (isNaN(lat) || isNaN(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+
+function parseHomeCoords(val) {
+  const hint = document.getElementById('predCoordsHint');
+  const input = document.getElementById('predHomeCoords');
+  const parsed = parseLatLon(val);
+  if (parsed) {
+    hint.textContent = `✓ ${parsed.lat.toFixed(5)}, ${parsed.lon.toFixed(5)}`;
+    hint.style.color = 'var(--green)';
+    input.style.borderColor = 'var(--green)';
+  } else if (val.trim()) {
+    hint.textContent = '✗ не розпізнано';
+    hint.style.color = 'var(--danger)';
+    input.style.borderColor = 'var(--danger)';
+  } else {
+    hint.textContent = '';
+    input.style.borderColor = '';
   }
 }
 
 function fillPredFromAnalysis() {
   if (!metrics || !metrics.lat) return;
-  // Use first valid lat/lon as home
   for (let i = 0; i < metrics.lat.length; i++) {
     if (Math.abs(metrics.lat[i]) > 0.01 && Math.abs(metrics.lon[i]) > 0.01) {
-      document.getElementById('predHomeLat').value = metrics.lat[i].toFixed(7);
-      document.getElementById('predHomeLon').value = metrics.lon[i].toFixed(7);
+      const val = `${metrics.lat[i].toFixed(7)}, ${metrics.lon[i].toFixed(7)}`;
+      document.getElementById('predHomeCoords').value = val;
+      parseHomeCoords(val);
       break;
     }
   }
@@ -1906,14 +1945,15 @@ async function runPrediction() {
     errBox.textContent = 'Спочатку завантажте та проаналізуйте лог-файл.';
     errBox.classList.add('visible'); return;
   }
-  const homeLat  = parseFloat(document.getElementById('predHomeLat').value);
-  const homeLon  = parseFloat(document.getElementById('predHomeLon').value);
-  const windDir  = parseFloat(document.getElementById('predWindDir').value  || 0);
-  const windSpd  = parseFloat(document.getElementById('predWindSpeed').value || 0);
-  if (!homeLat || !homeLon) {
-    errBox.textContent = 'Введіть координати стартової точки (або натисніть «Заповнити зі звіту»).';
+  const homeCoords = parseLatLon(document.getElementById('predHomeCoords').value);
+  if (!homeCoords) {
+    errBox.textContent = 'Введіть координати стартової точки у будь-якому форматі, наприклад: 47.9078, 29.2017';
     errBox.classList.add('visible'); return;
   }
+  const homeLat  = homeCoords.lat;
+  const homeLon  = homeCoords.lon;
+  const windDir  = parseFloat(document.getElementById('predWindDir').value  || 0);
+  const windSpd  = parseFloat(document.getElementById('predWindSpeed').value || 0);
 
   // Send full telemetry — AI needs complete picture to find last valid GPS and descent profile
   const lastData = {
