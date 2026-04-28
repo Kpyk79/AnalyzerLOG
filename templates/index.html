@@ -1936,9 +1936,9 @@ function renderPredictionCharts(m) {
 }
 
 // ── DEAD RECKONING ────────────────────────────────────────────────
-// Integrates (heading × speed + wind) × dt from last valid GPS onwards.
-// windDirDeg — звідки дме вітер (метеорологічна конвенція)
-// windSpeedMs — швидкість вітру м/с
+// Integrates heading × speed × dt from last valid GPS onwards.
+// Wind is NOT added here — telemetry ground speed already reflects actual movement.
+// Wind drift is calculated only for the uncontrolled fall phase (done by AI).
 function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs) {
   const { t, lat, lon, spd_ms, hdg } = m;
 
@@ -1952,48 +1952,33 @@ function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs) {
     }
   }
 
-  // Wind blows TO this direction (meteorological: FROM windDirDeg)
-  const windToRad = ((windDirDeg + 180) % 360) * Math.PI / 180;
-  const wSpd      = Math.max(0, windSpeedMs || 0);
-
   const startIdx = Math.max(0, lastValidIdx);
-  let drLat = baseLat, drLon = baseLon;
-  let drDistOwn = 0, drDistWind = 0;
+  let drLat = baseLat, drLon = baseLon, drDistOwn = 0;
   const drTimeSecs = t.length > startIdx ? t[t.length - 1] - t[startIdx] : 0;
 
   for (let i = startIdx; i < t.length - 1; i++) {
     const dt = t[i + 1] - t[i];
-    if (dt <= 0 || dt > 10) continue;   // skip gaps / bad samples
+    if (dt <= 0 || dt > 10) continue;
 
-    // Drone's own motion vector
     const hdgRad = ((hdg[i] || 0) * Math.PI) / 180;
     const spd    = Math.max(0, spd_ms[i] || 0);
-    const dNorth = spd * Math.cos(hdgRad) * dt;
-    const dEast  = spd * Math.sin(hdgRad) * dt;
-
-    // Wind contribution every step (continuous drift after GPS loss)
-    const wNorth = wSpd * Math.cos(windToRad) * dt;
-    const wEast  = wSpd * Math.sin(windToRad) * dt;
 
     const latRad = drLat * Math.PI / 180;
-    drLat += (dNorth + wNorth) / 111320;
-    drLon += (dEast  + wEast)  / (111320 * Math.cos(latRad));
-
-    drDistOwn  += spd  * dt;
-    drDistWind += wSpd * dt;
+    drLat += (spd * Math.cos(hdgRad) * dt) / 111320;
+    drLon += (spd * Math.sin(hdgRad) * dt) / (111320 * Math.cos(latRad));
+    drDistOwn += spd * dt;
   }
 
   return {
-    lat:               drLat,
-    lon:               drLon,
-    last_valid_lat:    baseLat,
-    last_valid_lon:    baseLon,
-    last_valid_t:      lastValidIdx >= 0 ? Math.round(t[lastValidIdx]) : 0,
-    dist_own_m:        Math.round(drDistOwn),
-    wind_drift_m:      Math.round(drDistWind),
-    wind_to_deg:       Math.round((windDirDeg + 180) % 360),
-    dr_duration_s:     Math.round(drTimeSecs),
-    steps_integrated:  t.length - startIdx,
+    lat:              drLat,
+    lon:              drLon,
+    last_valid_lat:   baseLat,
+    last_valid_lon:   baseLon,
+    last_valid_t:     lastValidIdx >= 0 ? Math.round(t[lastValidIdx]) : 0,
+    dist_own_m:       Math.round(drDistOwn),
+    wind_to_deg:      Math.round((windDirDeg + 180) % 360),
+    dr_duration_s:    Math.round(drTimeSecs),
+    steps_integrated: t.length - startIdx,
   };
 }
 
@@ -2061,9 +2046,8 @@ async function runPrediction() {
     // DR info line
     const drInfo = `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.7">
       📡 <b style="color:var(--text)">Dead reckoning</b>: від GPS-фіксу на ${dr.last_valid_t}с,
-      тривалість ${dr.dr_duration_s}с, ${dr.steps_integrated} кроків<br>
-      🚁 Власний рух дрона: <b style="color:var(--accent)">${dr.dist_own_m}м</b> &nbsp;|&nbsp;
-      💨 Зсув вітром (${windSpd} м/с → ${dr.wind_to_deg}°): <b style="color:var(--warn)">${dr.wind_drift_m}м</b>
+      тривалість ${dr.dr_duration_s}с — пройдено ${dr.dist_own_m}м (${dr.steps_integrated} кроків)<br>
+      💨 Зсув вітром враховано тільки при падінні (${windSpd} м/с → ${dr.wind_to_deg}°)
     </div>`;
     if (data.pred_lat && data.pred_lon) {
       const latF = data.pred_lat.toFixed(7), lonF = data.pred_lon.toFixed(7);
