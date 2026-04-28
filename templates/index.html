@@ -1952,7 +1952,8 @@ function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs) {
     }
   }
 
-  const startIdx = Math.max(0, lastValidIdx);
+  const noGps    = lastValidIdx < 0;           // entire flight without GPS
+  const startIdx = noGps ? 0 : lastValidIdx;   // integrate from GPS-loss point (or start)
   let drLat = baseLat, drLon = baseLon, drDistOwn = 0;
   const drTimeSecs = t.length > startIdx ? t[t.length - 1] - t[startIdx] : 0;
 
@@ -1974,7 +1975,8 @@ function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs) {
     lon:              drLon,
     last_valid_lat:   baseLat,
     last_valid_lon:   baseLon,
-    last_valid_t:     lastValidIdx >= 0 ? Math.round(t[lastValidIdx]) : 0,
+    last_valid_t:     noGps ? null : Math.round(t[lastValidIdx]),
+    no_gps:           noGps,
     dist_own_m:       Math.round(drDistOwn),
     wind_to_deg:      Math.round((windDirDeg + 180) % 360),
     dr_duration_s:    Math.round(drTimeSecs),
@@ -2005,20 +2007,42 @@ async function runPrediction() {
   // ── Pre-compute dead reckoning in browser (integrates full telemetry) ──
   const dr = computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd);
 
-  // ── Summary of last-moment telemetry for fall-physics refinement ──
-  const n    = Math.min(10, metrics.t.length);
-  const avg  = (arr) => arr.slice(-n).reduce((a,b) => a+b, 0) / n;
+  // ── Flight summary: last-moment values + post-GPS statistics ──
   const last = (arr) => arr[arr.length - 1] || 0;
+  const avgArr = (arr) => arr.length ? arr.reduce((a,b) => a+b, 0) / arr.length : 0;
+
+  // Post-GPS-loss segment indices
+  const postGpsIdx = dr.steps_integrated > 0
+    ? Math.max(0, metrics.t.length - dr.steps_integrated) : 0;
+  const postHdg  = metrics.hdg.slice(postGpsIdx);
+  const postSpd  = metrics.spd_ms.slice(postGpsIdx);
+  const postZ    = metrics.z_ms.slice(postGpsIdx);
+
+  // Circular mean for heading (avoids 359°/1° wrap issue)
+  function circMeanDeg(degs) {
+    if (!degs.length) return 0;
+    const sc = degs.reduce((a,d) => { a.s += Math.sin(d*Math.PI/180); a.c += Math.cos(d*Math.PI/180); return a; }, {s:0,c:0});
+    return ((Math.atan2(sc.s/degs.length, sc.c/degs.length) * 180/Math.PI) + 360) % 360;
+  }
+
+  // Last 10 points
+  const n10 = Math.min(10, metrics.t.length);
+  const avgLast10 = (arr) => arr.slice(-n10).reduce((a,b) => a+b, 0) / n10;
 
   const flightSummary = {
-    flight_duration_s:  Math.round(last(metrics.t)),
-    last_height_m:      +last(metrics.h).toFixed(1),
-    last_vspeed_ms:     +last(metrics.z_ms).toFixed(2),
-    last_hspeed_ms:     +avg(metrics.spd_ms).toFixed(2),
-    last_heading_deg:   +avg(metrics.hdg).toFixed(1),
-    last_pitch_deg:     +last(metrics.pitch).toFixed(1),
-    last_roll_deg:      +last(metrics.roll).toFixed(1),
-    max_height_m:       +Math.max(...metrics.h).toFixed(1),
+    flight_duration_s:       Math.round(last(metrics.t)),
+    max_height_m:            +Math.max(...metrics.h).toFixed(1),
+    last_height_m:           +last(metrics.h).toFixed(1),
+    last_vspeed_ms:          +last(metrics.z_ms).toFixed(2),
+    last_hspeed_ms:          +avgLast10(metrics.spd_ms).toFixed(2),
+    last_heading_deg:        +avgLast10(metrics.hdg).toFixed(1),
+    last_pitch_deg:          +last(metrics.pitch).toFixed(1),
+    last_roll_deg:           +last(metrics.roll).toFixed(1),
+    // Post-GPS-loss averages (full segment — overall direction of travel)
+    post_gps_avg_hdg_deg:    +circMeanDeg(postHdg).toFixed(1),
+    post_gps_avg_spd_ms:     +avgArr(postSpd).toFixed(2),
+    post_gps_avg_vspeed_ms:  +avgArr(postZ).toFixed(2),
+    post_gps_duration_s:     dr.dr_duration_s,
   };
 
   document.getElementById('predLoader').classList.add('show');
@@ -2044,11 +2068,16 @@ async function runPrediction() {
     // Render result
     const card = document.getElementById('predCoordsCard');
     // DR info line
-    const drInfo = `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.7">
-      📡 <b style="color:var(--text)">Dead reckoning</b>: від GPS-фіксу на ${dr.last_valid_t}с,
-      тривалість ${dr.dr_duration_s}с — пройдено ${dr.dist_own_m}м (${dr.steps_integrated} кроків)<br>
-      💨 Зсув вітром враховано тільки при падінні (${windSpd} м/с → ${dr.wind_to_deg}°)
-    </div>`;
+    const drInfo = dr.no_gps
+      ? `<div style="font-size:11px;color:var(--warn);margin-top:8px;line-height:1.7">
+          ⚠ <b>Політ без GPS</b> — dead reckoning від стартової точки (вся телеметрія, ${dr.dr_duration_s}с, ${dr.dist_own_m}м).
+          Похибка може бути значною. 💨 Вітер враховано при падінні (${windSpd} м/с → ${dr.wind_to_deg}°)
+        </div>`
+      : `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.7">
+          📡 <b style="color:var(--text)">Dead reckoning</b>: від GPS-фіксу на ${dr.last_valid_t}с,
+          тривалість ${dr.dr_duration_s}с — пройдено ${dr.dist_own_m}м (${dr.steps_integrated} кроків)<br>
+          💨 Зсув вітром враховано тільки при падінні (${windSpd} м/с → ${dr.wind_to_deg}°)
+        </div>`;
     if (data.pred_lat && data.pred_lon) {
       const latF = data.pred_lat.toFixed(7), lonF = data.pred_lon.toFixed(7);
       const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
