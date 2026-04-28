@@ -2525,24 +2525,36 @@
       return maxIdx;
     }
 
-    function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs) {
+    // forceManualHome = true  → ignore log GPS entirely; integrate from t=0
+    //                           using the operator-supplied home coords.
+    //                           Use this when the user has entered coords manually
+    //                           (spoofed log GPS, no-GPS flight, operator-anchored start).
+    // forceManualHome = false → normal mode: find last valid GPS fix in the log
+    //                           and start integration from there.
+    function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs,
+                                  forceManualHome = false) {
       const { t, lat, lon, spd_ms, hdg } = m;
       // Height above takeoff in metres
       const h = m.h || m.alt || m.height || [];
 
       // ═══════════════════════════════════════════════════════════════
-      // STEP 1 — Find last valid GPS fix → incident (base) position
+      // STEP 1 — Determine base position and integration start index
       // ═══════════════════════════════════════════════════════════════
       let lastValidIdx = -1, baseLat = homeLat, baseLon = homeLon;
-      for (let i = 0; i < lat.length; i++) {
-        if (Math.abs(lat[i]) > 0.01 && Math.abs(lon[i]) > 0.01) {
-          lastValidIdx = i;
-          baseLat = lat[i];
-          baseLon = lon[i];
+
+      if (!forceManualHome) {
+        // Normal mode: use last valid GPS from the log
+        for (let i = 0; i < lat.length; i++) {
+          if (Math.abs(lat[i]) > 0.01 && Math.abs(lon[i]) > 0.01) {
+            lastValidIdx = i;
+            baseLat = lat[i];
+            baseLon = lon[i];
+          }
         }
       }
+      // forceManualHome = true → lastValidIdx stays -1, baseLat/Lon = manual input
 
-      const noGps = lastValidIdx < 0;
+      const noGps    = lastValidIdx < 0;   // true for no-GPS log OR forceManualHome
       const startIdx = noGps ? 0 : lastValidIdx;
 
       // ═══════════════════════════════════════════════════════════════
@@ -2658,6 +2670,8 @@
         peak_h_m: Math.round(incidentH),
         peak_t_s: Math.round(peakT),
         fall_duration_s: Math.round(fallTimeS),
+        // Distinguishes "true no-GPS log" from "operator overrode with manual home"
+        manual_home: forceManualHome,
       };
     }
 
@@ -2682,7 +2696,9 @@
       const windSpd = parseFloat(document.getElementById('predWindSpeed').value || 0);
 
       // ── Pre-compute dead reckoning in browser (integrates full telemetry) ──
-      const dr = computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd);
+      // forceManualHome=true: user explicitly entered home coords → ignore log GPS,
+      // integrate from t=0 with the operator-supplied position as anchor.
+      const dr = computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd, true);
       _lastKmlDr = dr;   // cache for KML export
 
       // ── Flight summary: last-moment values + post-GPS statistics ──
@@ -2853,10 +2869,12 @@
       const windDir = parseFloat(document.getElementById('predWindDir').value  || 0);
       const windSpd = parseFloat(document.getElementById('predWindSpeed').value || 0);
 
-      // Use cached DR if available, otherwise compute fresh
+      // Use cached DR if available, otherwise compute fresh.
+      // Always forceManualHome=true — KML export uses the same anchor logic
+      // as runPrediction (operator coords override log GPS).
       const dr = _lastKmlDr ||
         (homeLat !== null
-          ? computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd)
+          ? computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd, true)
           : null);
 
       const kml = buildFlightKML(metrics, dr, _lastKmlPred, homeLat, homeLon, fileName);
@@ -2887,9 +2905,11 @@
         }
       }
 
-      // ── Build DR (Phase 1) waypoints: last GPS → incident peak ────────
+      // ── Build DR (Phase 1) waypoints: home → incident peak ───────────
+      // dr.no_gps is true both for no-GPS logs AND forceManualHome=true,
+      // so in both cases we start from t=0 with homeLat/homeLon.
       const drPoints = [];
-      if (dr && (dr.last_valid_lat || homeLat !== null)) {
+      if (dr && homeLat !== null) {
         const { t, hdg, spd_ms, h } = m;
         let startIdx = dr.no_gps ? 0 : -1;
         let baseLat = homeLat, baseLon = homeLon;
