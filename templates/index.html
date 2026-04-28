@@ -1,2153 +1,2843 @@
 <!DOCTYPE html>
 <html lang="uk">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>AnalyzerLOG — Аналіз польотних логів БпЛА</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>AnalyzerLOG — Аналіз польотних логів БпЛА</title>
 
-<!-- ── PWA ──────────────────────────────────────────────────────── -->
-<link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#00d4aa">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="AnalyzerLOG">
+  <!-- ── PWA ──────────────────────────────────────────────────────── -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#00d4aa">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AnalyzerLOG">
 
-<!-- ── Favicon ──────────────────────────────────────────────────── -->
-<link rel="icon" type="image/x-icon"  href="/static/favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-16.png">
+  <!-- ── Favicon ──────────────────────────────────────────────────── -->
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-16.png">
 
-<!-- ── Apple touch icons ────────────────────────────────────────── -->
-<link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152.png">
-<link rel="apple-touch-icon" sizes="144x144" href="/static/icons/icon-144.png">
-<link rel="apple-touch-icon" sizes="128x128" href="/static/icons/icon-128.png">
-<link rel="apple-touch-icon" sizes="96x96"   href="/static/icons/icon-96.png">
-<link rel="apple-touch-icon" sizes="72x72"   href="/static/icons/icon-72.png">
+  <!-- ── Apple touch icons ────────────────────────────────────────── -->
+  <link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="/static/icons/icon-144.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="/static/icons/icon-128.png">
+  <link rel="apple-touch-icon" sizes="96x96" href="/static/icons/icon-96.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="/static/icons/icon-72.png">
 
-<!-- ── SEO / Social ─────────────────────────────────────────────── -->
-<meta name="description" content="Аналіз польотних логів DJI Airdata CSV з ШІ-звітом українською">
+  <!-- ── SEO / Social ─────────────────────────────────────────────── -->
+  <meta name="description" content="Аналіз польотних логів DJI Airdata CSV з ШІ-звітом українською">
 
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<style>
-  :root {
-    --bg: #0a0c10;
-    --bg2: #111318;
-    --bg3: #1a1d24;
-    --accent: #00d4aa;
-    --accent2: #0099ff;
-    --warn: #ff6b35;
-    --danger: #ff3355;
-    --text: #c8cdd6;
-    --text-dim: #6b7280;
-    --border: #2a2f3a;
-    --green: #22c55e;
-    --yellow: #f59e0b;
-    --radius: 14px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { font-size: 15px; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', Arial, sans-serif;
-    line-height: 1.6;
-    min-height: 100vh;
-  }
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0c10;
+      --bg2: #111318;
+      --bg3: #1a1d24;
+      --accent: #00d4aa;
+      --accent2: #0099ff;
+      --warn: #ff6b35;
+      --danger: #ff3355;
+      --text: #c8cdd6;
+      --text-dim: #6b7280;
+      --border: #2a2f3a;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --radius: 14px;
+    }
 
-  /* ── HEADER ── */
-  .header {
-    background: linear-gradient(135deg, #0d1117, #161b22);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .header-logo {
-    width: 38px; height: 38px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 19px; flex-shrink: 0;
-  }
-  .header h1 { font-size: 18px; font-weight: 700; color: #fff; line-height: 1.2; }
-  .header p { font-size: 11px; color: var(--text-dim); }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  /* ── CONTAINER ── */
-  .container { max-width: 1360px; margin: 0 auto; padding: 20px 16px; }
+    html {
+      font-size: 15px;
+    }
 
-  /* ── UPLOAD ZONE ── */
-  .upload-zone {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
-    padding: 36px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .2s, background .2s;
-    background: var(--bg2);
-    position: relative;
-  }
-  .upload-zone:hover, .upload-zone.drag-over {
-    border-color: var(--accent);
-    background: rgba(0,212,170,.05);
-  }
-  .upload-zone input[type=file] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-  }
-  .upload-icon { font-size: 40px; margin-bottom: 10px; }
-  .upload-zone h2 { font-size: 16px; color: #fff; margin-bottom: 6px; }
-  .upload-zone p { color: var(--text-dim); font-size: 12px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', Arial, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
 
-  /* ── FILE INFO ── */
-  .file-info {
-    display: none;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 18px;
-    margin-top: 14px;
-    align-items: center;
-    gap: 12px;
-  }
-  .file-info.visible { display: flex; }
-  .file-icon { font-size: 26px; flex-shrink: 0; }
-  .file-details h3 { color: #fff; font-size: 14px; word-break: break-all; }
-  .file-details p { color: var(--text-dim); font-size: 12px; }
-  .file-details .badges { display:flex; gap:6px; margin-top:4px; flex-wrap:wrap; }
-  .badge-format {
-    display:inline-block; padding:2px 9px; border-radius:20px;
-    font-size:11px; font-weight:700;
-  }
-  .badge-format.csv2 { background:rgba(34,197,94,.12); color:var(--green); border:1px solid rgba(34,197,94,.25); }
-  .badge-format.csv1 { background:rgba(245,158,11,.12); color:var(--yellow); border:1px solid rgba(245,158,11,.25); }
-  .badge-format.converted { background:rgba(0,153,255,.12); color:var(--accent2); border:1px solid rgba(0,153,255,.25); }
-  .dl-btn {
-    display:none; align-items:center; gap:6px;
-    padding:5px 12px; border-radius:8px; border:1px solid rgba(0,153,255,.3);
-    background:rgba(0,153,255,.08); color:var(--accent2);
-    cursor:pointer; font-size:12px; font-weight:700; font-family:inherit;
-    transition:all .2s; text-decoration:none; white-space:nowrap;
-  }
-  .dl-btn:hover { background:rgba(0,153,255,.18); }
-  .dl-btn.visible { display:inline-flex; }
+    /* ── HEADER ── */
+    .header {
+      background: linear-gradient(135deg, #0d1117, #161b22);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
 
-  /* ── MISSION TYPE BUTTONS ── */
-  .mission-row {
-    margin-top: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .mission-label {
-    font-size: 12px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    font-weight: 600;
-  }
-  .mission-btns {
-    display: flex;
-    gap: 10px;
-  }
-  .mission-btn {
-    flex: 1;
-    padding: 13px 10px;
-    border-radius: 12px;
-    border: 2px solid var(--border);
-    background: var(--bg3);
-    color: var(--text-dim);
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all .2s;
-    text-align: center;
-    letter-spacing: .3px;
-  }
-  .mission-btn:hover { border-color: var(--accent2); color: var(--accent2); }
-  .mission-btn.selected-loss {
-    border-color: var(--danger);
-    background: rgba(255,51,85,.1);
-    color: var(--danger);
-  }
-  .mission-btn.selected-damage {
-    border-color: var(--warn);
-    background: rgba(255,107,53,.1);
-    color: var(--warn);
-  }
-  .mission-btn.selected-has {
-    border-color: var(--green);
-    background: rgba(34,197,94,.1);
-    color: var(--green);
-  }
-  .mission-btn.selected-none {
-    border-color: var(--text-dim);
-    background: rgba(107,114,128,.08);
-    color: var(--text-dim);
-  }
-  .mission-btn.selected-active {
-    border-color: var(--accent);
-    background: rgba(0,212,170,.1);
-    color: var(--accent);
-  }
-  .mission-btn.selected-notactive {
-    border-color: var(--warn);
-    background: rgba(245,158,11,.1);
-    color: var(--warn);
-  }
-  .sub-row {
-    margin-top: 10px;
-    padding: 12px 14px;
-    background: rgba(0,212,170,.04);
-    border: 1px solid rgba(0,212,170,.15);
-    border-radius: 12px;
-    display: none;
-  }
-  .sub-row.visible { display: block; }
-  .sub-label {
-    font-size: 11px;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    font-weight: 600;
-    margin-bottom: 8px;
-  }
+    .header-logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 19px;
+      flex-shrink: 0;
+    }
 
-  /* ── ANALYZE BUTTON ── */
-  .analyze-row {
-    margin-top: 14px;
-    display: flex;
-    gap: 10px;
-  }
-  .btn {
-    padding: 12px 22px;
-    border-radius: 12px;
-    border: none;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 700;
-    transition: all .2s;
-    font-family: inherit;
-  }
-  .btn-primary {
-    flex: 1;
-    background: linear-gradient(135deg, var(--accent), #009977);
-    color: #000;
-  }
-  .btn-primary:hover:not(:disabled) { opacity: .88; transform: translateY(-1px); }
-  .btn-primary:disabled { opacity: .35; cursor: not-allowed; transform: none; }
-  .btn-secondary {
-    background: var(--bg3);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 12px 18px;
-  }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+    }
 
-  /* ── ERROR ── */
-  .error-box {
-    display: none;
-    background: rgba(255,51,85,.08);
-    border: 1px solid rgba(255,51,85,.3);
-    border-radius: 12px;
-    padding: 14px 18px;
-    margin-top: 14px;
-    color: var(--danger);
-    font-size: 13px;
-  }
-  .error-box.visible { display: block; }
+    .header p {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
 
-  /* ── LOADER ── */
-  .loader { display: none; text-align: center; padding: 40px 20px; }
-  .loader.visible { display: block; }
-  .spinner {
-    width: 44px; height: 44px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 14px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loader p { color: var(--text-dim); font-size: 13px; }
+    /* ── CONTAINER ── */
+    .container {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
 
-  /* ── RESULTS ── */
-  #results { display: none; }
-  #results.visible { display: block; }
+    /* ── UPLOAD ZONE ── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: var(--bg2);
+      position: relative;
+    }
 
-  /* ── MESSENGER BLOCK ── */
-  .messenger-block {
-    background: linear-gradient(135deg, rgba(0,212,170,.07), rgba(0,153,255,.04));
-    border: 1px solid rgba(0,212,170,.25);
-    border-radius: var(--radius);
-    padding: 18px 18px 18px;
-    margin-bottom: 20px;
-    position: relative;
-  }
-  .messenger-block .tag {
-    display: inline-block;
-    background: var(--accent);
-    color: #000;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 20px;
-    margin-bottom: 12px;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-  }
-  .messenger-text {
-    white-space: pre-wrap;
-    font-size: 14px;
-    line-height: 1.75;
-    color: #e2e8f0;
-    padding-right: 80px;
-  }
-  .copy-btn {
-    position: absolute;
-    top: 14px; right: 14px;
-    background: rgba(0,212,170,.12);
-    border: 1px solid rgba(0,212,170,.25);
-    color: var(--accent);
-    padding: 7px 14px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 700;
-    transition: all .2s;
-    white-space: nowrap;
-    font-family: inherit;
-  }
-  .copy-btn:hover { background: rgba(0,212,170,.22); }
-  .copy-btn.copied { background: var(--green); color: #000; border-color: var(--green); }
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(0, 212, 170, .05);
+    }
 
-  /* ── STATS GRID ── */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  .stat-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 12px;
-    text-align: center;
-  }
-  .stat-card .val {
-    font-size: 22px;
-    font-weight: 800;
-    color: var(--accent);
-    line-height: 1.2;
-    word-break: break-word;
-  }
-  .stat-card .val.warn { color: var(--warn); }
-  .stat-card .val.danger { color: var(--danger); }
-  .stat-card .val.ok { color: var(--green); }
-  .stat-card .lbl { font-size: 11px; color: var(--text-dim); margin-top: 5px; line-height: 1.3; }
+    .upload-zone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
 
-  /* ── COORD BLOCK ── */
-  .coord-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .coord-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 16px;
-    font-size: 13px;
-    line-height: 1.8;
-  }
-  .coord-card .coord-title {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-dim);
-    margin-bottom: 6px;
-  }
-  .coord-card .coord-val {
-    font-family: monospace;
-    font-size: 13px;
-    color: var(--accent);
-    word-break: break-all;
-  }
-  .coord-card .coord-time {
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--accent);
-    margin-bottom: 4px;
-    line-height: 1.2;
-  }
-  .coord-card a.map-link {
-    display: inline-block;
-    margin-top: 6px;
-    font-size: 11px;
-    color: var(--accent2);
-    text-decoration: none;
-    opacity: 0.85;
-  }
-  .coord-card a.map-link:hover { opacity: 1; text-decoration: underline; }
+    .upload-icon {
+      font-size: 40px;
+      margin-bottom: 10px;
+    }
 
-  /* ── SECTION ── */
-  .section {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 16px;
-    overflow: hidden;
-  }
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg3);
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  .section-header h2 { font-size: 14px; font-weight: 700; color: #fff; }
-  .section-header .icon { font-size: 16px; }
-  .section-header .chevron { margin-left: auto; color: var(--text-dim); transition: transform .2s; }
-  .section-header.collapsed .chevron { transform: rotate(-90deg); }
-  .section-body { padding: 18px; }
-  .section-body.hidden { display: none; }
+    .upload-zone h2 {
+      font-size: 16px;
+      color: #fff;
+      margin-bottom: 6px;
+    }
 
-  /* ── CHARTS GRID ── */
-  .charts-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-  }
-  .chart-group-label {
-    grid-column: 1 / -1;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-dim);
-    padding: 4px 2px 0;
-    border-top: 1px solid var(--border);
-    margin-top: 4px;
-  }
-  .chart-group-label:first-child { border-top: none; margin-top: 0; }
-  .chart-wrap {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 4px 4px 4px;
-    overflow: hidden;
-  }
-  .chart-title {
-    padding: 10px 14px 2px;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: .4px;
-  }
-  .chart-full { grid-column: 1 / -1; }
+    .upload-zone p {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
 
-  /* ── RESULTS TABS ── */
-  .results-tabs {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 18px;
-    border-bottom: 2px solid var(--border);
-    padding-bottom: 0;
-  }
-  .rtab {
-    background: none;
-    border: none;
-    border-bottom: 3px solid transparent;
-    color: var(--text-dim);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 18px;
-    cursor: pointer;
-    border-radius: 8px 8px 0 0;
-    margin-bottom: -2px;
-    transition: color .15s, border-color .15s, background .15s;
-  }
-  .rtab:hover { color: var(--text); background: var(--bg2); }
-  .rtab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--bg2); }
-  .rtab-panel { display: none; }
-  .rtab-panel.active { display: block; }
+    /* ── FILE INFO ── */
+    .file-info {
+      display: none;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-top: 14px;
+      align-items: center;
+      gap: 12px;
+    }
 
-  /* ── PREDICTION TAB ── */
-  .pred-form {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 18px;
-  }
-  .pred-field { display: flex; flex-direction: column; gap: 5px; }
-  .pred-field label { font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .6px; color: var(--text-dim); }
-  .pred-field input, .pred-field select {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 14px;
-    padding: 9px 12px;
-    outline: none;
-    transition: border-color .15s;
-  }
-  .pred-field input:focus, .pred-field select:focus { border-color: var(--accent); }
-  .pred-field select option { background: var(--bg3); }
-  .pred-charts-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    margin-bottom: 18px;
-  }
-  .pred-chart-full { grid-column: 1 / -1; }
-  .pred-run-row { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; }
-  .pred-loader { display:none; align-items:center; gap:10px; color:var(--text-dim); font-size:13px; }
-  .pred-loader.show { display:flex; }
-  .pred-loader .spinner { width:18px; height:18px; border:2px solid var(--border);
-    border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
-  .pred-result { display:none; }
-  .pred-result.show { display:block; }
-  .pred-coords-card {
-    background: linear-gradient(135deg, #0f1a1e 0%, var(--bg2) 100%);
-    border: 1px solid var(--accent);
-    border-radius: 14px;
-    padding: 20px 24px;
-    margin-bottom: 14px;
-  }
-  .pred-coords-card .pc-label {
-    font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 1px; color: var(--accent); margin-bottom: 8px;
-  }
-  .pred-coords-card .pc-coords {
-    font-family: monospace; font-size: 20px; font-weight: 800;
-    color: var(--text); margin-bottom: 10px;
-  }
-  .pred-coords-card a.pc-maps {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--accent); color: #000; font-size: 12px; font-weight: 700;
-    padding: 6px 14px; border-radius: 20px; text-decoration: none;
-    transition: opacity .15s;
-  }
-  .pred-coords-card a.pc-maps:hover { opacity: .85; }
-  .pred-explanation {
-    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
-    padding: 18px 20px; font-size: 13px; line-height: 1.7; color: var(--text);
-    white-space: pre-wrap; word-break: break-word;
-  }
-  .pred-explanation strong { color: var(--accent); }
-  @media (max-width: 640px) {
-    .pred-form { grid-template-columns: 1fr 1fr; }
-    .pred-charts-grid { grid-template-columns: 1fr; }
-    .pred-chart-full { grid-column: 1; }
-  }
+    .file-info.visible {
+      display: flex;
+    }
 
-  /* ── EVENTS TABLE ── */
-  .events-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .events-table th {
-    background: var(--bg3);
-    color: var(--text-dim);
-    padding: 8px 12px;
-    text-align: left;
-    font-weight: 600;
-    border-bottom: 1px solid var(--border);
-    font-size: 12px;
-  }
-  .events-table td { padding: 8px 12px; border-bottom: 1px solid rgba(42,47,58,.5); vertical-align: top; }
-  .events-table tr:last-child td { border-bottom: none; }
-  .t-cell { color: var(--accent2); font-family: monospace; white-space: nowrap; }
-  .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-  .badge-reb { background: rgba(255,107,53,.15); color: var(--warn); border: 1px solid rgba(255,107,53,.3); }
-  .badge-spoof { background: rgba(255,51,85,.15); color: var(--danger); border: 1px solid rgba(255,51,85,.3); }
-  .badge-atti { background: rgba(0,153,255,.15); color: var(--accent2); border: 1px solid rgba(0,153,255,.3); }
-  .badge-ok { background: rgba(34,197,94,.1); color: var(--green); border: 1px solid rgba(34,197,94,.2); }
+    .file-icon {
+      font-size: 26px;
+      flex-shrink: 0;
+    }
 
-  /* ── REPORT TEXT ── */
-  .report-text {
-    white-space: pre-wrap;
-    font-size: 14px;
-    line-height: 1.85;
-    color: var(--text);
-    font-family: 'Segoe UI', Arial, sans-serif;
-    tab-size: 4;
-  }
+    .file-details h3 {
+      color: #fff;
+      font-size: 14px;
+      word-break: break-all;
+    }
 
-  /* ── SCROLLBAR ── */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .file-details p {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
 
-  /* ── TABLE RESPONSIVE ── */
-  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .file-details .badges {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
 
-  /* ── MOBILE ── */
-  @media (max-width: 700px) {
-    html { font-size: 14px; }
-    .container { padding: 12px 10px; }
-    .upload-zone { padding: 24px 16px; }
-    .upload-icon { font-size: 32px; }
-    .upload-zone h2 { font-size: 15px; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .stat-card .val { font-size: 18px; }
-    .coord-row { grid-template-columns: 1fr; }
-    .charts-grid { grid-template-columns: 1fr; }
-    .chart-full { grid-column: 1; }
-    .messenger-text { padding-right: 0; padding-bottom: 44px; }
-    .copy-btn { top: auto; bottom: 12px; right: 14px; }
-    .mission-btns { flex-direction: column; }
-    .analyze-row { flex-direction: column; }
-    .btn { width: 100%; }
-    .events-table th:nth-child(2),
-    .events-table td:nth-child(2) { display: none; }
-    .section-body { padding: 12px; }
-    .section-header { padding: 12px 14px; }
-    .report-text { font-size: 13px; }
-  }
-  @media (max-width: 420px) {
-    .header h1 { font-size: 16px; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .stat-card .val { font-size: 16px; }
-    .stat-card .lbl { font-size: 10px; }
-  }
-</style>
+    .badge-format {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .badge-format.csv2 {
+      background: rgba(34, 197, 94, .12);
+      color: var(--green);
+      border: 1px solid rgba(34, 197, 94, .25);
+    }
+
+    .badge-format.csv1 {
+      background: rgba(245, 158, 11, .12);
+      color: var(--yellow);
+      border: 1px solid rgba(245, 158, 11, .25);
+    }
+
+    .badge-format.converted {
+      background: rgba(0, 153, 255, .12);
+      color: var(--accent2);
+      border: 1px solid rgba(0, 153, 255, .25);
+    }
+
+    .dl-btn {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 153, 255, .3);
+      background: rgba(0, 153, 255, .08);
+      color: var(--accent2);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: inherit;
+      transition: all .2s;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .dl-btn:hover {
+      background: rgba(0, 153, 255, .18);
+    }
+
+    .dl-btn.visible {
+      display: inline-flex;
+    }
+
+    /* ── MISSION TYPE BUTTONS ── */
+    .mission-row {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mission-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      font-weight: 600;
+    }
+
+    .mission-btns {
+      display: flex;
+      gap: 10px;
+    }
+
+    .mission-btn {
+      flex: 1;
+      padding: 13px 10px;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      background: var(--bg3);
+      color: var(--text-dim);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      text-align: center;
+      letter-spacing: .3px;
+    }
+
+    .mission-btn:hover {
+      border-color: var(--accent2);
+      color: var(--accent2);
+    }
+
+    .mission-btn.selected-loss {
+      border-color: var(--danger);
+      background: rgba(255, 51, 85, .1);
+      color: var(--danger);
+    }
+
+    .mission-btn.selected-damage {
+      border-color: var(--warn);
+      background: rgba(255, 107, 53, .1);
+      color: var(--warn);
+    }
+
+    .mission-btn.selected-has {
+      border-color: var(--green);
+      background: rgba(34, 197, 94, .1);
+      color: var(--green);
+    }
+
+    .mission-btn.selected-none {
+      border-color: var(--text-dim);
+      background: rgba(107, 114, 128, .08);
+      color: var(--text-dim);
+    }
+
+    .mission-btn.selected-active {
+      border-color: var(--accent);
+      background: rgba(0, 212, 170, .1);
+      color: var(--accent);
+    }
+
+    .mission-btn.selected-notactive {
+      border-color: var(--warn);
+      background: rgba(245, 158, 11, .1);
+      color: var(--warn);
+    }
+
+    .sub-row {
+      margin-top: 10px;
+      padding: 12px 14px;
+      background: rgba(0, 212, 170, .04);
+      border: 1px solid rgba(0, 212, 170, .15);
+      border-radius: 12px;
+      display: none;
+    }
+
+    .sub-row.visible {
+      display: block;
+    }
+
+    .sub-label {
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    /* ── ANALYZE BUTTON ── */
+    .analyze-row {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 12px 22px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      transition: all .2s;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      flex: 1;
+      background: linear-gradient(135deg, var(--accent), #009977);
+      color: #000;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      opacity: .88;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 12px 18px;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── ERROR ── */
+    .error-box {
+      display: none;
+      background: rgba(255, 51, 85, .08);
+      border: 1px solid rgba(255, 51, 85, .3);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-top: 14px;
+      color: var(--danger);
+      font-size: 13px;
+    }
+
+    .error-box.visible {
+      display: block;
+    }
+
+    /* ── LOADER ── */
+    .loader {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .loader.visible {
+      display: block;
+    }
+
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 14px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loader p {
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    /* ── RESULTS ── */
+    #results {
+      display: none;
+    }
+
+    #results.visible {
+      display: block;
+    }
+
+    /* ── MESSENGER BLOCK ── */
+    .messenger-block {
+      background: linear-gradient(135deg, rgba(0, 212, 170, .07), rgba(0, 153, 255, .04));
+      border: 1px solid rgba(0, 212, 170, .25);
+      border-radius: var(--radius);
+      padding: 18px 18px 18px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .messenger-block .tag {
+      display: inline-block;
+      background: var(--accent);
+      color: #000;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .messenger-text {
+      white-space: pre-wrap;
+      font-size: 14px;
+      line-height: 1.75;
+      color: #e2e8f0;
+      padding-right: 80px;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: rgba(0, 212, 170, .12);
+      border: 1px solid rgba(0, 212, 170, .25);
+      color: var(--accent);
+      padding: 7px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      transition: all .2s;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+
+    .copy-btn:hover {
+      background: rgba(0, 212, 170, .22);
+    }
+
+    .copy-btn.copied {
+      background: var(--green);
+      color: #000;
+      border-color: var(--green);
+    }
+
+    /* ── STATS GRID ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: center;
+    }
+
+    .stat-card .val {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .stat-card .val.warn {
+      color: var(--warn);
+    }
+
+    .stat-card .val.danger {
+      color: var(--danger);
+    }
+
+    .stat-card .val.ok {
+      color: var(--green);
+    }
+
+    .stat-card .lbl {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 5px;
+      line-height: 1.3;
+    }
+
+    /* ── COORD BLOCK ── */
+    .coord-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .coord-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .coord-card .coord-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+
+    .coord-card .coord-val {
+      font-family: monospace;
+      font-size: 13px;
+      color: var(--accent);
+      word-break: break-all;
+    }
+
+    .coord-card .coord-time {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+
+    .coord-card a.map-link {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--accent2);
+      text-decoration: none;
+      opacity: 0.85;
+    }
+
+    .coord-card a.map-link:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+
+    /* ── SECTION ── */
+    .section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg3);
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .section-header h2 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .section-header .icon {
+      font-size: 16px;
+    }
+
+    .section-header .chevron {
+      margin-left: auto;
+      color: var(--text-dim);
+      transition: transform .2s;
+    }
+
+    .section-header.collapsed .chevron {
+      transform: rotate(-90deg);
+    }
+
+    .section-body {
+      padding: 18px;
+    }
+
+    .section-body.hidden {
+      display: none;
+    }
+
+    /* ── CHARTS GRID ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    .chart-group-label {
+      grid-column: 1 / -1;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      padding: 4px 2px 0;
+      border-top: 1px solid var(--border);
+      margin-top: 4px;
+    }
+
+    .chart-group-label:first-child {
+      border-top: none;
+      margin-top: 0;
+    }
+
+    .chart-wrap {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px 4px 4px;
+      overflow: hidden;
+    }
+
+    .chart-title {
+      padding: 10px 14px 2px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    .chart-full {
+      grid-column: 1 / -1;
+    }
+
+    /* ── RESULTS TABS ── */
+    .results-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 18px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0;
+    }
+
+    .rtab {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 18px;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      margin-bottom: -2px;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+
+    .rtab:hover {
+      color: var(--text);
+      background: var(--bg2);
+    }
+
+    .rtab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: var(--bg2);
+    }
+
+    .rtab-panel {
+      display: none;
+    }
+
+    .rtab-panel.active {
+      display: block;
+    }
+
+    /* ── PREDICTION TAB ── */
+    .pred-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .pred-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .pred-field label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--text-dim);
+    }
+
+    .pred-field input,
+    .pred-field select {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .pred-field input:focus,
+    .pred-field select:focus {
+      border-color: var(--accent);
+    }
+
+    .pred-field select option {
+      background: var(--bg3);
+    }
+
+    .pred-charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .pred-chart-full {
+      grid-column: 1 / -1;
+    }
+
+    .pred-run-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .pred-loader {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .pred-loader.show {
+      display: flex;
+    }
+
+    .pred-loader .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    .pred-result {
+      display: none;
+    }
+
+    .pred-result.show {
+      display: block;
+    }
+
+    .pred-coords-card {
+      background: linear-gradient(135deg, #0f1a1e 0%, var(--bg2) 100%);
+      border: 1px solid var(--accent);
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: 14px;
+    }
+
+    .pred-coords-card .pc-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .pred-coords-card .pc-coords {
+      font-family: monospace;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .pred-coords-card a.pc-maps {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent);
+      color: #000;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 20px;
+      text-decoration: none;
+      transition: opacity .15s;
+    }
+
+    .pred-coords-card a.pc-maps:hover {
+      opacity: .85;
+    }
+
+    .pred-explanation {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .pred-explanation strong {
+      color: var(--accent);
+    }
+
+    @media (max-width: 640px) {
+      .pred-form {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .pred-charts-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .pred-chart-full {
+        grid-column: 1;
+      }
+    }
+
+    /* ── EVENTS TABLE ── */
+    .events-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .events-table th {
+      background: var(--bg3);
+      color: var(--text-dim);
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .events-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(42, 47, 58, .5);
+      vertical-align: top;
+    }
+
+    .events-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .t-cell {
+      color: var(--accent2);
+      font-family: monospace;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-reb {
+      background: rgba(255, 107, 53, .15);
+      color: var(--warn);
+      border: 1px solid rgba(255, 107, 53, .3);
+    }
+
+    .badge-spoof {
+      background: rgba(255, 51, 85, .15);
+      color: var(--danger);
+      border: 1px solid rgba(255, 51, 85, .3);
+    }
+
+    .badge-atti {
+      background: rgba(0, 153, 255, .15);
+      color: var(--accent2);
+      border: 1px solid rgba(0, 153, 255, .3);
+    }
+
+    .badge-ok {
+      background: rgba(34, 197, 94, .1);
+      color: var(--green);
+      border: 1px solid rgba(34, 197, 94, .2);
+    }
+
+    /* ── REPORT TEXT ── */
+    .report-text {
+      white-space: pre-wrap;
+      font-size: 14px;
+      line-height: 1.85;
+      color: var(--text);
+      font-family: 'Segoe UI', Arial, sans-serif;
+      tab-size: 4;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    /* ── TABLE RESPONSIVE ── */
+    .table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── MOBILE ── */
+    @media (max-width: 700px) {
+      html {
+        font-size: 14px;
+      }
+
+      .container {
+        padding: 12px 10px;
+      }
+
+      .upload-zone {
+        padding: 24px 16px;
+      }
+
+      .upload-icon {
+        font-size: 32px;
+      }
+
+      .upload-zone h2 {
+        font-size: 15px;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+
+      .stat-card .val {
+        font-size: 18px;
+      }
+
+      .coord-row {
+        grid-template-columns: 1fr;
+      }
+
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-full {
+        grid-column: 1;
+      }
+
+      .messenger-text {
+        padding-right: 0;
+        padding-bottom: 44px;
+      }
+
+      .copy-btn {
+        top: auto;
+        bottom: 12px;
+        right: 14px;
+      }
+
+      .mission-btns {
+        flex-direction: column;
+      }
+
+      .analyze-row {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+      }
+
+      .events-table th:nth-child(2),
+      .events-table td:nth-child(2) {
+        display: none;
+      }
+
+      .section-body {
+        padding: 12px;
+      }
+
+      .section-header {
+        padding: 12px 14px;
+      }
+
+      .report-text {
+        font-size: 13px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .header h1 {
+        font-size: 16px;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .stat-card .val {
+        font-size: 16px;
+      }
+
+      .stat-card .lbl {
+        font-size: 10px;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<div class="header">
-  <div class="header-logo">🛰</div>
-  <div style="flex:1">
-    <h1>AnalyzerLOG</h1>
-    <p>Аналіз польотних логів БпЛА · DJI Airdata CSV</p>
-  </div>
-  <button id="installBtn" onclick="installApp()" style="display:none;align-items:center;gap:6px;
+  <div class="header">
+    <div class="header-logo">🛰</div>
+    <div style="flex:1">
+      <h1>AnalyzerLOG</h1>
+      <p>Аналіз польотних логів БпЛА · DJI Airdata CSV</p>
+    </div>
+    <button id="installBtn" onclick="installApp()" style="display:none;align-items:center;gap:6px;
     padding:7px 14px;border-radius:10px;border:1px solid rgba(0,212,170,.35);
     background:rgba(0,212,170,.1);color:#00d4aa;cursor:pointer;
     font-size:12px;font-weight:700;font-family:inherit;white-space:nowrap;">
-    ⬇ Встановити
-  </button>
-</div>
-
-<div class="container">
-
-  <!-- UPLOAD -->
-  <div class="upload-zone" id="dropzone">
-    <input type="file" id="fileInput" accept=".csv">
-    <div class="upload-icon">📂</div>
-    <h2>Перетягніть CSV-файл або натисніть для вибору</h2>
-    <p>DJI Airdata CSV — Формат 1 (кома/TAB) автоматично → Формат 2 (крапка з комою)</p>
-  </div>
-
-  <div class="file-info" id="fileInfo">
-    <div class="file-icon">📋</div>
-    <div class="file-details">
-      <h3 id="fileName">—</h3>
-      <p id="fileSize">—</p>
-      <div class="badges">
-        <span class="badge-format" id="formatBadge"></span>
-        <button class="dl-btn" id="dlNormBtn" onclick="downloadNormalized()">
-          ⬇ Завантажити нормалізований CSV
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MISSION TYPE -->
-  <div class="mission-row">
-    <div class="mission-label">Оберіть тип місії</div>
-    <div class="mission-btns">
-      <button class="mission-btn" id="btnLoss" onclick="selectMission('ВТРАТА')">
-        ⚠️&nbsp; ВТРАТА
-      </button>
-      <button class="mission-btn" id="btnDamage" onclick="selectMission('ПОШКОДЖЕННЯ')">
-        🔧&nbsp; ПОШКОДЖЕННЯ
-      </button>
-    </div>
-  </div>
-
-  <!-- FIRMWARE 1001 -->
-  <div class="mission-row" style="margin-top:10px">
-    <div class="mission-label">Прошивка «1001»</div>
-    <div class="mission-btns">
-      <button class="mission-btn" id="btnHas1001" onclick="selectFirmware('є')">
-        🛡&nbsp; є 1001
-      </button>
-      <button class="mission-btn" id="btnNo1001" onclick="selectFirmware('немає')">
-        ✕&nbsp; немає 1001
-      </button>
-    </div>
-
-    <!-- ANTISPOOF — показується тільки якщо "є 1001" -->
-    <div class="sub-row" id="antispoofRow">
-      <div class="sub-label">⚡ Режим антиспуфінгу (примусове відключення навіг. стеку)</div>
-      <div class="mission-btns">
-        <button class="mission-btn" id="btnActivated" onclick="selectAntispoof('активовано')">
-          ✅&nbsp; Активовано
-        </button>
-        <button class="mission-btn" id="btnNotActivated" onclick="selectAntispoof('не активовано')">
-          ⚠️&nbsp; Не активовано
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ANALYZE BUTTON -->
-  <div class="analyze-row">
-    <button class="btn btn-primary" id="analyzeBtn" disabled onclick="runAnalysis()">
-      ⚡ Аналізувати (ШІ)
+      ⬇ Встановити
     </button>
-    <button class="btn btn-secondary" onclick="resetAll()">↩</button>
   </div>
 
-  <div class="error-box" id="errorBox"></div>
+  <div class="container">
 
-  <div class="loader" id="loader">
-    <div class="spinner"></div>
-    <p>Аналізую дані польоту за допомогою ШІ…</p>
-    <p style="margin-top:4px;font-size:11px">Зазвичай 15–30 секунд</p>
-  </div>
-
-  <!-- RESULTS -->
-  <div id="results">
-
-    <!-- ── RESULTS TABS ─────────────────────────────────────────── -->
-    <div class="results-tabs" style="margin-top:20px">
-      <button class="rtab active" id="rtabAnalysis" onclick="switchTab('tabAnalysis')">📊 Аналіз польоту</button>
-      <button class="rtab"        id="rtabPredict"  onclick="switchTab('tabPredict')">🎯 Пошук місця</button>
+    <!-- UPLOAD -->
+    <div class="upload-zone" id="dropzone">
+      <input type="file" id="fileInput" accept=".csv">
+      <div class="upload-icon">📂</div>
+      <h2>Перетягніть CSV-файл або натисніть для вибору</h2>
+      <p>DJI Airdata CSV — Формат 1 (кома/TAB) автоматично → Формат 2 (крапка з комою)</p>
     </div>
 
-    <!-- ══════════════════ TAB 1 — ANALYSIS ══════════════════════ -->
-    <div id="tabAnalysis" class="rtab-panel active">
-
-      <!-- MESSENGER -->
-      <div class="messenger-block">
-        <span class="tag">📱 Текст для месенджера</span>
-        <button class="copy-btn" id="copyBtn" onclick="copyMessenger()">Копіювати</button>
-        <div class="messenger-text" id="messengerText"></div>
-      </div>
-
-      <!-- AI REPORT (moved here, below messenger) -->
-      <div class="section" style="margin-top:14px">
-        <div class="section-header collapsed" onclick="toggleSection(this)">
-          <span class="icon">📄</span>
-          <h2>Повний аналітичний звіт</h2>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="section-body hidden">
-          <div class="report-text" id="reportText"></div>
+    <div class="file-info" id="fileInfo">
+      <div class="file-icon">📋</div>
+      <div class="file-details">
+        <h3 id="fileName">—</h3>
+        <p id="fileSize">—</p>
+        <div class="badges">
+          <span class="badge-format" id="formatBadge"></span>
+          <button class="dl-btn" id="dlNormBtn" onclick="downloadNormalized()">
+            ⬇ Завантажити нормалізований CSV
+          </button>
         </div>
       </div>
+    </div>
 
-      <!-- STATS -->
-      <div class="stats-grid" id="statsGrid" style="margin-top:14px"></div>
+    <!-- MISSION TYPE -->
+    <div class="mission-row">
+      <div class="mission-label">Оберіть тип місії</div>
+      <div class="mission-btns">
+        <button class="mission-btn" id="btnLoss" onclick="selectMission('ВТРАТА')">
+          ⚠️&nbsp; ВТРАТА
+        </button>
+        <button class="mission-btn" id="btnDamage" onclick="selectMission('ПОШКОДЖЕННЯ')">
+          🔧&nbsp; ПОШКОДЖЕННЯ
+        </button>
+      </div>
+    </div>
 
-      <!-- COORDINATES -->
-      <div id="coordBlock" style="display:none;margin-bottom:14px">
-        <div class="coord-row">
-          <div class="coord-card" id="coordHome"></div>
-          <div class="coord-card" id="coordFinal"></div>
-        </div>
+    <!-- FIRMWARE 1001 -->
+    <div class="mission-row" style="margin-top:10px">
+      <div class="mission-label">Прошивка «1001»</div>
+      <div class="mission-btns">
+        <button class="mission-btn" id="btnHas1001" onclick="selectFirmware('є')">
+          🛡&nbsp; є 1001
+        </button>
+        <button class="mission-btn" id="btnNo1001" onclick="selectFirmware('немає')">
+          ✕&nbsp; немає 1001
+        </button>
       </div>
 
-      <!-- EVENTS -->
-      <div class="section">
-        <div class="section-header" onclick="toggleSection(this)">
-          <span class="icon">⚡</span>
-          <h2>Хронологія ключових подій</h2>
-          <span class="chevron">▾</span>
+      <!-- ANTISPOOF — показується тільки якщо "є 1001" -->
+      <div class="sub-row" id="antispoofRow">
+        <div class="sub-label">⚡ Режим антиспуфінгу (примусове відключення навіг. стеку)</div>
+        <div class="mission-btns">
+          <button class="mission-btn" id="btnActivated" onclick="selectAntispoof('активовано')">
+            ✅&nbsp; Активовано
+          </button>
+          <button class="mission-btn" id="btnNotActivated" onclick="selectAntispoof('не активовано')">
+            ⚠️&nbsp; Не активовано
+          </button>
         </div>
-        <div class="section-body">
-          <div class="table-scroll">
-            <table class="events-table">
-              <thead><tr><th>Час (с)</th><th>UTC+2</th><th>Тип</th><th>Опис</th></tr></thead>
-              <tbody id="eventsBody"></tbody>
-            </table>
+      </div>
+    </div>
+
+    <!-- ANALYZE BUTTON -->
+    <div class="analyze-row">
+      <button class="btn btn-primary" id="analyzeBtn" disabled onclick="runAnalysis()">
+        ⚡ Аналізувати (ШІ)
+      </button>
+      <button class="btn btn-secondary" onclick="resetAll()">↩</button>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+      <p>Аналізую дані польоту за допомогою ШІ…</p>
+      <p style="margin-top:4px;font-size:11px">Зазвичай 15–30 секунд</p>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="results">
+
+      <!-- ── RESULTS TABS ─────────────────────────────────────────── -->
+      <div class="results-tabs" style="margin-top:20px">
+        <button class="rtab active" id="rtabAnalysis" onclick="switchTab('tabAnalysis')">📊 Аналіз польоту</button>
+        <button class="rtab" id="rtabPredict" onclick="switchTab('tabPredict')">🎯 Пошук місця</button>
+      </div>
+
+      <!-- ══════════════════ TAB 1 — ANALYSIS ══════════════════════ -->
+      <div id="tabAnalysis" class="rtab-panel active">
+
+        <!-- MESSENGER -->
+        <div class="messenger-block">
+          <span class="tag">📱 Текст для месенджера</span>
+          <button class="copy-btn" id="copyBtn" onclick="copyMessenger()">Копіювати</button>
+          <div class="messenger-text" id="messengerText"></div>
+        </div>
+
+        <!-- AI REPORT (moved here, below messenger) -->
+        <div class="section" style="margin-top:14px">
+          <div class="section-header collapsed" onclick="toggleSection(this)">
+            <span class="icon">📄</span>
+            <h2>Повний аналітичний звіт</h2>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="section-body hidden">
+            <div class="report-text" id="reportText"></div>
           </div>
         </div>
-      </div>
 
-      <!-- CHARTS -->
-      <div class="section">
-        <div class="section-header" onclick="toggleSection(this)">
-          <span class="icon">📈</span>
-          <h2>Графіки телеметрії</h2>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="section-body">
-          <div class="charts-grid" id="chartsGrid">
+        <!-- STATS -->
+        <div class="stats-grid" id="statsGrid" style="margin-top:14px"></div>
 
-            <!-- ── Рух ─────────────────────────────────────────── -->
-            <div class="chart-group-label">Рух</div>
-            <div class="chart-wrap">
-              <div class="chart-title">Висота над точкою зльоту, м</div>
-              <div id="chartHeight" style="height:220px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Горизонтальна швидкість, м/с</div>
-              <div id="chartSpeed" style="height:220px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Дистанція від точки зльоту, м</div>
-              <div id="chartDist" style="height:220px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Вертикальна швидкість, м/с</div>
-              <div id="chartVspeed" style="height:220px"></div>
-            </div>
-
-            <!-- ── Навігація ──────────────────────────────────── -->
-            <div class="chart-group-label">Навігація</div>
-            <div class="chart-wrap chart-full">
-              <div class="chart-title">Якість сигналу GNSS — рівень (0–5) та кількість супутників</div>
-              <div id="chartGnss" style="height:220px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Компас — курс (°) та аномалії</div>
-              <div id="chartCompass" style="height:220px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Кількість супутників GPS</div>
-              <div id="chartSats" style="height:220px"></div>
-            </div>
-
-            <!-- ── Живлення ───────────────────────────────────── -->
-            <div class="chart-group-label">Живлення</div>
-            <div class="chart-wrap">
-              <div class="chart-title">Заряд акумулятора, %</div>
-              <div id="chartBat" style="height:220px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Напруга акумулятора, В</div>
-              <div id="chartVolt" style="height:220px"></div>
-            </div>
-
-            <!-- ── Орієнтація ─────────────────────────────────── -->
-            <div class="chart-group-label">Орієнтація</div>
-            <div class="chart-wrap chart-full">
-              <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
-              <div id="chartAttitude" style="height:200px"></div>
-            </div>
-
-            <!-- ── Режим / Карта ──────────────────────────────── -->
-            <div class="chart-group-label">Режим та маршрут</div>
-            <div class="chart-wrap chart-full">
-              <div class="chart-title">Режим польоту по часу</div>
-              <div id="chartState" style="height:160px"></div>
-            </div>
-            <div class="chart-wrap chart-full">
-              <div class="chart-title">Траєкторія польоту</div>
-              <div id="chartMap" style="height:380px"></div>
-            </div>
-
+        <!-- COORDINATES -->
+        <div id="coordBlock" style="display:none;margin-bottom:14px">
+          <div class="coord-row">
+            <div class="coord-card" id="coordHome"></div>
+            <div class="coord-card" id="coordFinal"></div>
           </div>
         </div>
-      </div>
 
-    </div><!-- /tabAnalysis -->
-
-    <!-- ══════════════════ TAB 2 — PREDICTION ════════════════════ -->
-    <div id="tabPredict" class="rtab-panel">
-
-      <!-- Input form -->
-      <div class="section">
-        <div class="section-header" onclick="toggleSection(this)">
-          <span class="icon">📍</span>
-          <h2>Вхідні дані для розрахунку</h2>
-          <span class="chevron">▾</span>
+        <!-- EVENTS -->
+        <div class="section">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="icon">⚡</span>
+            <h2>Хронологія ключових подій</h2>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="section-body">
+            <div class="table-scroll">
+              <table class="events-table">
+                <thead>
+                  <tr>
+                    <th>Час (с)</th>
+                    <th>UTC+2</th>
+                    <th>Тип</th>
+                    <th>Опис</th>
+                  </tr>
+                </thead>
+                <tbody id="eventsBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <div class="section-body">
-          <div class="pred-form">
-            <div class="pred-field" style="grid-column:1/-1">
-              <label>Координати стартової точки</label>
-              <div style="position:relative">
-                <input type="text" id="predHomeCoords"
-                  placeholder="напр. 47.907815, 29.201759  або  47.907815 29.201759"
-                  oninput="parseHomeCoords(this.value)"
-                  style="width:100%;padding-right:110px">
-                <span id="predCoordsHint" style="
+
+        <!-- CHARTS -->
+        <div class="section">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="icon">📈</span>
+            <h2>Графіки телеметрії</h2>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="section-body">
+            <div class="charts-grid" id="chartsGrid">
+
+              <!-- ── Рух ─────────────────────────────────────────── -->
+              <div class="chart-group-label">Рух</div>
+              <div class="chart-wrap">
+                <div class="chart-title">Висота над точкою зльоту, м</div>
+                <div id="chartHeight" style="height:220px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Горизонтальна швидкість, м/с</div>
+                <div id="chartSpeed" style="height:220px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Дистанція від точки зльоту, м</div>
+                <div id="chartDist" style="height:220px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Вертикальна швидкість, м/с</div>
+                <div id="chartVspeed" style="height:220px"></div>
+              </div>
+
+              <!-- ── Навігація ──────────────────────────────────── -->
+              <div class="chart-group-label">Навігація</div>
+              <div class="chart-wrap chart-full">
+                <div class="chart-title">Якість сигналу GNSS — рівень (0–5) та кількість супутників</div>
+                <div id="chartGnss" style="height:220px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Компас — курс (°) та аномалії</div>
+                <div id="chartCompass" style="height:220px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Кількість супутників GPS</div>
+                <div id="chartSats" style="height:220px"></div>
+              </div>
+
+              <!-- ── Живлення ───────────────────────────────────── -->
+              <div class="chart-group-label">Живлення</div>
+              <div class="chart-wrap">
+                <div class="chart-title">Заряд акумулятора, %</div>
+                <div id="chartBat" style="height:220px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Напруга акумулятора, В</div>
+                <div id="chartVolt" style="height:220px"></div>
+              </div>
+
+              <!-- ── Орієнтація ─────────────────────────────────── -->
+              <div class="chart-group-label">Орієнтація</div>
+              <div class="chart-wrap chart-full">
+                <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
+                <div id="chartAttitude" style="height:200px"></div>
+              </div>
+
+              <!-- ── Режим / Карта ──────────────────────────────── -->
+              <div class="chart-group-label">Режим та маршрут</div>
+              <div class="chart-wrap chart-full">
+                <div class="chart-title">Режим польоту по часу</div>
+                <div id="chartState" style="height:160px"></div>
+              </div>
+              <div class="chart-wrap chart-full">
+                <div class="chart-title">Траєкторія польоту</div>
+                <div id="chartMap" style="height:380px"></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /tabAnalysis -->
+
+      <!-- ══════════════════ TAB 2 — PREDICTION ════════════════════ -->
+      <div id="tabPredict" class="rtab-panel">
+
+        <!-- Input form -->
+        <div class="section">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="icon">📍</span>
+            <h2>Вхідні дані для розрахунку</h2>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="section-body">
+            <div class="pred-form">
+              <div class="pred-field" style="grid-column:1/-1">
+                <label>Координати стартової точки</label>
+                <div style="position:relative">
+                  <input type="text" id="predHomeCoords"
+                    placeholder="напр. 47.907815, 29.201759  або  47.907815 29.201759"
+                    oninput="parseHomeCoords(this.value)" style="width:100%;padding-right:110px">
+                  <span id="predCoordsHint" style="
                   position:absolute;right:10px;top:50%;transform:translateY(-50%);
                   font-size:11px;color:var(--text-dim);pointer-events:none"></span>
+                </div>
               </div>
-            </div>
-            <div class="pred-field">
-              <label>Напрямок вітру (звідки, °)</label>
-              <div style="display:flex;gap:6px">
-                <select id="predWindPreset" onchange="windPresetChange()" style="flex:1">
-                  <option value="">— обрати —</option>
-                  <option value="0">Північ (0°)</option>
-                  <option value="45">Пн-Схід (45°)</option>
-                  <option value="90">Схід (90°)</option>
-                  <option value="135">Пд-Схід (135°)</option>
-                  <option value="180">Південь (180°)</option>
-                  <option value="225">Пд-Захід (225°)</option>
-                  <option value="270">Захід (270°)</option>
-                  <option value="315">Пн-Захід (315°)</option>
-                  <option value="custom">Вручну…</option>
-                </select>
-                <input type="number" id="predWindDir" min="0" max="360" placeholder="0–360" style="width:80px">
+              <div class="pred-field">
+                <label>Напрямок вітру (звідки, °)</label>
+                <div style="display:flex;gap:6px">
+                  <select id="predWindPreset" onchange="windPresetChange()" style="flex:1">
+                    <option value="">— обрати —</option>
+                    <option value="0">Північ (0°)</option>
+                    <option value="45">Пн-Схід (45°)</option>
+                    <option value="90">Схід (90°)</option>
+                    <option value="135">Пд-Схід (135°)</option>
+                    <option value="180">Південь (180°)</option>
+                    <option value="225">Пд-Захід (225°)</option>
+                    <option value="270">Захід (270°)</option>
+                    <option value="315">Пн-Захід (315°)</option>
+                    <option value="custom">Вручну…</option>
+                  </select>
+                  <input type="number" id="predWindDir" min="0" max="360" placeholder="0–360" style="width:80px">
+                </div>
               </div>
-            </div>
-            <div class="pred-field">
-              <label>Швидкість вітру, м/с</label>
-              <input type="number" id="predWindSpeed" min="0" max="50" step="0.1" placeholder="напр. 5">
-            </div>
-            <div class="pred-field" style="grid-column:1/-1">
-              <label>Використати дані з аналізу</label>
-              <button class="btn btn-secondary" style="width:fit-content;font-size:12px"
-                onclick="fillPredFromAnalysis()">↓ Заповнити координати зі звіту</button>
+              <div class="pred-field">
+                <label>Швидкість вітру, м/с</label>
+                <input type="number" id="predWindSpeed" min="0" max="50" step="0.1" placeholder="напр. 5">
+              </div>
+              <div class="pred-field" style="grid-column:1/-1">
+                <label>Використати дані з аналізу</label>
+                <button class="btn btn-secondary" style="width:fit-content;font-size:12px"
+                  onclick="fillPredFromAnalysis()">↓ Заповнити координати зі звіту</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 5 mini-charts -->
-      <div class="section">
-        <div class="section-header" onclick="toggleSection(this)">
-          <span class="icon">📈</span>
-          <h2>Телеметрія для аналізу (остання фаза польоту)</h2>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="section-body">
-          <div class="pred-charts-grid">
-            <div class="chart-wrap">
-              <div class="chart-title">Висота над точкою зльоту, м</div>
-              <div id="predChartHeight" style="height:200px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Горизонтальна швидкість, м/с</div>
-              <div id="predChartSpeed" style="height:200px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Вертикальна швидкість, м/с</div>
-              <div id="predChartVspeed" style="height:200px"></div>
-            </div>
-            <div class="chart-wrap">
-              <div class="chart-title">Компас — курс (°) та аномалії</div>
-              <div id="predChartCompass" style="height:200px"></div>
-            </div>
-            <div class="chart-wrap pred-chart-full">
-              <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
-              <div id="predChartAttitude" style="height:200px"></div>
+        <!-- 5 mini-charts -->
+        <div class="section">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="icon">📈</span>
+            <h2>Телеметрія польоту (повна)</h2>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="section-body">
+            <div class="pred-charts-grid">
+              <div class="chart-wrap">
+                <div class="chart-title">Висота над точкою зльоту, м</div>
+                <div id="predChartHeight" style="height:200px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Горизонтальна швидкість, м/с</div>
+                <div id="predChartSpeed" style="height:200px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Вертикальна швидкість, м/с</div>
+                <div id="predChartVspeed" style="height:200px"></div>
+              </div>
+              <div class="chart-wrap">
+                <div class="chart-title">Компас — курс (°) та аномалії</div>
+                <div id="predChartCompass" style="height:200px"></div>
+              </div>
+              <div class="chart-wrap pred-chart-full">
+                <div class="chart-title">Кут нахилу Pitch / Roll, градуси</div>
+                <div id="predChartAttitude" style="height:200px"></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Run button + loader -->
-      <div class="pred-run-row">
-        <button class="btn btn-primary" id="predBtn" onclick="runPrediction()">
-          🎯 Розрахувати точку приземлення (ШІ)
-        </button>
-        <div class="pred-loader" id="predLoader">
-          <div class="spinner"></div>
-          <span>ШІ розраховує точку… ~15–30 с</span>
+        <!-- Run button + loader -->
+        <div class="pred-run-row">
+          <button class="btn btn-primary" id="predBtn" onclick="runPrediction()">
+            🎯 Розрахувати точку приземлення (ШІ)
+          </button>
+          <div class="pred-loader" id="predLoader">
+            <div class="spinner"></div>
+            <span>ШІ розраховує точку… ~15–30 с</span>
+          </div>
         </div>
-      </div>
-      <div class="error-box" id="predErrorBox"></div>
+        <div class="error-box" id="predErrorBox"></div>
 
-      <!-- Result -->
-      <div class="pred-result" id="predResult">
-        <div class="pred-coords-card" id="predCoordsCard"></div>
-        <div class="pred-explanation" id="predExplanation"></div>
-      </div>
+        <!-- Result -->
+        <div class="pred-result" id="predResult">
+          <div class="pred-coords-card" id="predCoordsCard"></div>
+          <div class="pred-explanation" id="predExplanation"></div>
+        </div>
 
-    </div><!-- /tabPredict -->
+      </div><!-- /tabPredict -->
 
-  </div><!-- /results -->
-</div><!-- /container -->
+    </div><!-- /results -->
+  </div><!-- /container -->
 
-<script>
-// ── STATE ────────────────────────────────────────────────────────────────
-let csvText      = '';     // semicolon-normalised, used internally by parseCSV()
-let rawCsvText   = '';     // original file bytes — used for comma→; download
-let metrics      = {};
-let fileName     = '';
-let missionType  = null;   // 'ВТРАТА' | 'ПОШКОДЖЕННЯ'
-let firmware1001 = null;   // 'є' | 'немає'
-let antispoof    = null;   // 'активовано' | 'не активовано' | null
+  <script>
+    // ── STATE ────────────────────────────────────────────────────────────────
+    let csvText = '';     // semicolon-normalised, used internally by parseCSV()
+    let rawCsvText = '';     // original file bytes — used for comma→; download
+    let metrics = {};
+    let fileName = '';
+    let missionType = null;   // 'ВТРАТА' | 'ПОШКОДЖЕННЯ'
+    let firmware1001 = null;   // 'є' | 'немає'
+    let antispoof = null;   // 'активовано' | 'не активовано' | null
 
-// ── DRAG & DROP ──────────────────────────────────────────────────────────
-const dropzone  = document.getElementById('dropzone');
-const fileInput = document.getElementById('fileInput');
+    // ── DRAG & DROP ──────────────────────────────────────────────────────────
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
 
-['dragover','dragenter'].forEach(e =>
-  dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.add('drag-over'); })
-);
-['dragleave','drop'].forEach(e =>
-  dropzone.addEventListener(e, () => dropzone.classList.remove('drag-over'))
-);
-dropzone.addEventListener('drop', ev => {
-  ev.preventDefault();
-  const f = ev.dataTransfer.files[0];
-  if (f) loadFile(f);
-});
-fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
-
-function detectSep(firstLine) {
-  const tabs   = (firstLine.match(/\t/g)  || []).length;
-  const commas = (firstLine.match(/,/g)   || []).length;
-  const semis  = (firstLine.match(/;/g)   || []).length;
-  if (tabs > commas && tabs > semis) return '\t';
-  return commas > semis ? ',' : ';';
-}
-
-function normalizeCSVClient(text) {
-  /**
-   * Convert tab- or comma-separated Airdata CSV to semicolon format 2.
-   * Returns { normalized: string, converted: boolean, sep: detected separator }
-   */
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) return { normalized: text, converted: false, sep: ';' };
-
-  const sep = detectSep(lines[0]);
-  if (sep === ';') return { normalized: text, converted: false, sep };
-
-  // Parse a single CSV row respecting quoted fields (only needed for comma sep)
-  function parseRowComma(line) {
-    const result = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
-      else { cur += ch; }
-    }
-    result.push(cur);
-    return result;
-  }
-
-  function parseRowTab(line) { return line.split('\t'); }
-
-  function normDt(dt) {
-    dt = dt.trim();
-    // "2025-12-30 08:12:24" or "2026-04-23 03:50:05" → "23.04.2026 3:50"
-    const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
-    if (!m) return dt;
-    const [, yr, mo, dy, hh, mm] = m;
-    return `${parseInt(dy)}.${mo}.${yr} ${parseInt(hh)}:${mm}`;
-  }
-
-  const parseRow = sep === '\t' ? parseRowTab : parseRowComma;
-  const allRows  = lines.map(parseRow);
-  const headers  = allRows[0].map(h => h.trim());
-  const dtCol    = headers.indexOf('datetime(utc)');
-
-  const outLines = [headers.join(';')];
-  for (const row of allRows.slice(1)) {
-    const cells = row.map((c, i) => {
-      c = c.trim();
-      if (i === dtCol) c = normDt(c);
-      return c;
+    ['dragover', 'dragenter'].forEach(e =>
+      dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.add('drag-over'); })
+    );
+    ['dragleave', 'drop'].forEach(e =>
+      dropzone.addEventListener(e, () => dropzone.classList.remove('drag-over'))
+    );
+    dropzone.addEventListener('drop', ev => {
+      ev.preventDefault();
+      const f = ev.dataTransfer.files[0];
+      if (f) loadFile(f);
     });
-    outLines.push(cells.join(';'));
-  }
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
 
-  return { normalized: outLines.join('\n'), converted: true, sep };
-}
-
-function loadFile(f) {
-  fileName = f.name;
-  document.getElementById('fileName').textContent = f.name;
-  document.getElementById('fileSize').textContent = fmtSize(f.size);
-  document.getElementById('fileInfo').classList.add('visible');
-  showError('');
-  checkAnalyzeBtn();
-
-  const reader = new FileReader();
-  reader.onload = e => {
-    const raw = e.target.result;
-    rawCsvText = raw;                                          // keep original for download
-    const { normalized, converted, sep } = normalizeCSVClient(raw);
-
-    csvText = normalized;
-
-    // Show format badge
-    const badge = document.getElementById('formatBadge');
-    const dlBtn = document.getElementById('dlNormBtn');
-    if (converted) {
-      const sepLabel = sep === '\t' ? 'TAB' : 'кома';
-      badge.textContent = `⚠ Формат 1 (${sepLabel}) → Формат 2 (;)`;
-      badge.className = 'badge-format converted';
-      dlBtn.classList.add('visible');
-    } else {
-      badge.textContent = '✓ Формат 2 (крапка з комою)';
-      badge.className = 'badge-format csv2';
-      dlBtn.classList.remove('visible');
+    function detectSep(firstLine) {
+      const tabs = (firstLine.match(/\t/g) || []).length;
+      const commas = (firstLine.match(/,/g) || []).length;
+      const semis = (firstLine.match(/;/g) || []).length;
+      if (tabs > commas && tabs > semis) return '\t';
+      return commas > semis ? ',' : ';';
     }
 
-    const rows = parseCSV(csvText);
-    metrics = extractMetrics(rows);
-    const summary = buildSummary(metrics);
+    function normalizeCSVClient(text) {
+      /**
+       * Convert tab- or comma-separated Airdata CSV to semicolon format 2.
+       * Returns { normalized: string, converted: boolean, sep: detected separator }
+       */
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (!lines.length) return { normalized: text, converted: false, sep: ';' };
 
-    document.getElementById('results').classList.add('visible');
-    renderStats(summary);
-    renderCoords(summary);
-    renderEvents(metrics, summary);
-    renderCharts(metrics, summary);
-  };
-  reader.readAsText(f, 'UTF-8');
-}
+      const sep = detectSep(lines[0]);
+      if (sep === ';') return { normalized: text, converted: false, sep };
 
-function downloadNormalized() {
-  if (!rawCsvText || !fileName) return;
+      // Parse a single CSV row respecting quoted fields (only needed for comma sep)
+      function parseRowComma(line) {
+        const result = [];
+        let cur = '', inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { inQ = !inQ; }
+          else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+          else { cur += ch; }
+        }
+        result.push(cur);
+        return result;
+      }
 
-  // Re-parse original comma CSV properly (handles quoted fields, strips quotes)
-  // then join with ';' → exact Format 2 structure.
-  function parseRowComma(line) {
-    const result = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
-      else { cur += ch; }
+      function parseRowTab(line) { return line.split('\t'); }
+
+      function normDt(dt) {
+        dt = dt.trim();
+        // "2025-12-30 08:12:24" or "2026-04-23 03:50:05" → "23.04.2026 3:50"
+        const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+        if (!m) return dt;
+        const [, yr, mo, dy, hh, mm] = m;
+        return `${parseInt(dy)}.${mo}.${yr} ${parseInt(hh)}:${mm}`;
+      }
+
+      const parseRow = sep === '\t' ? parseRowTab : parseRowComma;
+      const allRows = lines.map(parseRow);
+      const headers = allRows[0].map(h => h.trim());
+      const dtCol = headers.indexOf('datetime(utc)');
+
+      const outLines = [headers.join(';')];
+      for (const row of allRows.slice(1)) {
+        const cells = row.map((c, i) => {
+          c = c.trim();
+          if (i === dtCol) c = normDt(c);
+          return c;
+        });
+        outLines.push(cells.join(';'));
+      }
+
+      return { normalized: outLines.join('\n'), converted: true, sep };
     }
-    result.push(cur);
-    return result;
-  }
 
-  function normDt(dt) {
-    dt = dt.trim();
-    const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
-    if (!m) return dt;
-    return `${parseInt(m[3])}.${m[2]}.${m[1]} ${parseInt(m[4])}:${m[5]}`;
-  }
+    function loadFile(f) {
+      fileName = f.name;
+      document.getElementById('fileName').textContent = f.name;
+      document.getElementById('fileSize').textContent = fmtSize(f.size);
+      document.getElementById('fileInfo').classList.add('visible');
+      showError('');
+      checkAnalyzeBtn();
 
-  const lines   = rawCsvText.split(/\r?\n/).filter(l => l.trim());
-  const headers = parseRowComma(lines[0]).map(h => h.trim());
-  const dtCol   = headers.indexOf('datetime(utc)');
+      const reader = new FileReader();
+      reader.onload = e => {
+        const raw = e.target.result;
+        rawCsvText = raw;                                          // keep original for download
+        const { normalized, converted, sep } = normalizeCSVClient(raw);
 
-  const outLines = [headers.join(';')];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = parseRowComma(lines[i]).map(c => c.trim());
-    if (dtCol >= 0 && dtCol < cols.length) cols[dtCol] = normDt(cols[dtCol]);
-    outLines.push(cols.join(';'));
-  }
+        csvText = normalized;
 
-  const bom  = '\uFEFF'; // UTF-8 BOM — Excel відкриває файл правильно
-  const blob = new Blob([bom + outLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = fileName.replace(/\.csv$/i, '_normalized.csv');
-  a.click();
-  URL.revokeObjectURL(url);
-}
+        // Show format badge
+        const badge = document.getElementById('formatBadge');
+        const dlBtn = document.getElementById('dlNormBtn');
+        if (converted) {
+          const sepLabel = sep === '\t' ? 'TAB' : 'кома';
+          badge.textContent = `⚠ Формат 1 (${sepLabel}) → Формат 2 (;)`;
+          badge.className = 'badge-format converted';
+          dlBtn.classList.add('visible');
+        } else {
+          badge.textContent = '✓ Формат 2 (крапка з комою)';
+          badge.className = 'badge-format csv2';
+          dlBtn.classList.remove('visible');
+        }
 
-// ── MISSION SELECTION ────────────────────────────────────────────────────
-function selectMission(type) {
-  missionType = type;
-  document.getElementById('btnLoss').className   = 'mission-btn' + (type === 'ВТРАТА' ? ' selected-loss' : '');
-  document.getElementById('btnDamage').className = 'mission-btn' + (type === 'ПОШКОДЖЕННЯ' ? ' selected-damage' : '');
-  checkAnalyzeBtn();
-}
+        const rows = parseCSV(csvText);
+        metrics = extractMetrics(rows);
+        const summary = buildSummary(metrics);
 
-// ── FIRMWARE / ANTISPOOF ─────────────────────────────────────────────────
-function selectFirmware(val) {
-  firmware1001 = val;
-  document.getElementById('btnHas1001').className =
-    'mission-btn' + (val === 'є' ? ' selected-has' : '');
-  document.getElementById('btnNo1001').className =
-    'mission-btn' + (val === 'немає' ? ' selected-none' : '');
-
-  const row = document.getElementById('antispoofRow');
-  if (val === 'є') {
-    row.classList.add('visible');
-  } else {
-    row.classList.remove('visible');
-    antispoof = null;
-    document.getElementById('btnActivated').className    = 'mission-btn';
-    document.getElementById('btnNotActivated').className = 'mission-btn';
-  }
-  checkAnalyzeBtn();
-}
-
-function selectAntispoof(val) {
-  antispoof = val;
-  document.getElementById('btnActivated').className =
-    'mission-btn' + (val === 'активовано' ? ' selected-active' : '');
-  document.getElementById('btnNotActivated').className =
-    'mission-btn' + (val === 'не активовано' ? ' selected-notactive' : '');
-  checkAnalyzeBtn();
-}
-
-function checkAnalyzeBtn() {
-  const firmwareReady = firmware1001 !== null &&
-    (firmware1001 === 'немає' || antispoof !== null);
-  document.getElementById('analyzeBtn').disabled =
-    !(csvText && missionType && firmwareReady);
-}
-
-// ── CSV PARSER ───────────────────────────────────────────────────────────
-function parseCSV(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) return [];
-  const headers = lines[0].split(';').map(h => h.trim());
-  return lines.slice(1).map(line => {
-    const cols = line.split(';');
-    const row  = {};
-    headers.forEach((h, j) => { row[h] = (cols[j] || '').trim(); });
-    return row;
-  });
-}
-
-const FEET_TO_M = 0.3048, MPH_TO_MS = 0.44704, MPH_TO_KMH = 1.60934;
-
-function gv(row, ...keys) {
-  for (const k of keys) {
-    if (k in row) { const v = parseFloat(row[k]); if (!isNaN(v)) return v; }
-  }
-  return 0;
-}
-
-function extractMetrics(rows) {
-  const t=[], h=[], spd_ms=[], spd_kmh=[], dist=[], sats=[], bat=[];
-  const pitch=[], roll=[], hdg=[], lat=[], lon=[], z_ms=[], volt=[];
-  const states=[], msgs=[], dtimes=[], gpslvl=[];
-
-  for (const r of rows) {
-    t.push(gv(r,'time(millisecond)') / 1000);
-    h.push(gv(r,'height_above_takeoff(feet)') * FEET_TO_M);
-    const s = gv(r,'speed(mph)');
-    spd_ms.push(s * MPH_TO_MS);
-    spd_kmh.push(s * MPH_TO_KMH);
-    dist.push(gv(r,'distance(feet)') * FEET_TO_M);
-    sats.push(Math.round(gv(r,'satellites')));
-    gpslvl.push(Math.round(gv(r,'gpslevel')));
-    bat.push(gv(r,'battery_percent'));
-    pitch.push(gv(r,' pitch(degrees)','pitch(degrees)'));
-    roll.push(gv(r,' roll(degrees)','roll(degrees)'));
-    hdg.push(gv(r,' compass_heading(degrees)','compass_heading(degrees)'));
-    const la = parseFloat(r['latitude']||''), lo = parseFloat(r['longitude']||'');
-    lat.push(isNaN(la) ? 0 : la);
-    lon.push(isNaN(lo) ? 0 : lo);
-    z_ms.push(gv(r,' zSpeed(mph)','zSpeed(mph)') * MPH_TO_MS);
-    volt.push(gv(r,'voltage(v)'));
-    states.push(r['flycState'] || '');
-    msgs.push(r['message'] || '');
-    dtimes.push(r['datetime(utc)'] || '');
-  }
-  return { t, h, spd_ms, spd_kmh, dist, sats, gpslvl, bat, pitch, roll, hdg, lat, lon, z_ms, volt, states, msgs, dtimes };
-}
-
-function buildSummary(m) {
-  const t = m.t;
-  if (!t.length) return {};
-  const maxH = Math.max(...m.h), maxSms = Math.max(...m.spd_ms);
-  const maxKmh = Math.max(...m.spd_kmh), maxDist = Math.max(...m.dist);
-  const duration = Math.max(...t);
-
-  let jStart=null, jEnd=null;
-  for (let i=0;i<t.length;i++) {
-    if (t[i]>5 && m.sats[i]===0 && jStart===null) jStart=t[i];
-    if (jStart && m.sats[i]>0 && t[i]>jStart && jEnd===null) jEnd=t[i];
-  }
-  let spoof=null;
-  for (let i=0;i<t.length;i++) {
-    if (t[i]>10 && Math.abs(m.lat[i])<1 && Math.abs(m.lon[i])<1) { spoof=t[i]; break; }
-  }
-  const attiTimes=[];
-  let lastA=-999;
-  for (let i=0;i<t.length;i++) {
-    if (m.states[i].toUpperCase().includes('ATTI') && t[i]-lastA>5) { attiTimes.push(t[i]); lastA=t[i]; }
-  }
-  const allMsgs = m.msgs.join(' ').toLowerCase();
-  const isCrash = ['shock','crash','exiting gps'].some(w=>allMsgs.includes(w));
-  const minBat  = Math.min(...m.bat.filter(b=>b>0));
-
-  // Compass anomalies: heading jumps >60° per step (100ms)
-  const compassJumpIdx = [];
-  for (let i = 1; i < m.hdg.length; i++) {
-    let diff = Math.abs(m.hdg[i] - m.hdg[i-1]);
-    if (diff > 180) diff = 360 - diff;
-    if (diff > 60) compassJumpIdx.push(i);
-  }
-  // Spinning: ≥3 jumps within any 3-second window
-  let spinningDetected = false;
-  for (let i = 0; i < compassJumpIdx.length - 2; i++) {
-    const tStart = m.t[compassJumpIdx[i]];
-    const tEnd   = m.t[compassJumpIdx[i+2]];
-    if (tEnd - tStart <= 3) { spinningDetected = true; break; }
-  }
-
-  // Data Recorder File Index
-  let flightIndex = null;
-  for (const msg of m.msgs) {
-    const match = msg.match(/Data Recorder File Index is (\d+)/);
-    if (match) { flightIndex = parseInt(match[1]); break; }
-  }
-
-  // Flight modes used
-  const MODE_MAP = { 'sport':'Sport', 'cine':'Cine', 'p-gps':'Normal',
-                     'opti':'Normal', 'atti':'ATTI' };
-  const usedModes = [];
-  for (const st of m.states) {
-    const lc = st.toLowerCase();
-    for (const [key, label] of Object.entries(MODE_MAP)) {
-      if (lc.includes(key) && !usedModes.includes(label)) usedModes.push(label);
+        document.getElementById('results').classList.add('visible');
+        renderStats(summary);
+        renderCoords(summary);
+        renderEvents(metrics, summary);
+        renderCharts(metrics, summary);
+      };
+      reader.readAsText(f, 'UTF-8');
     }
-  }
 
-  return {
-    duration_s: r1(duration), max_height_m: r1(maxH),
-    max_speed_ms: r1(maxSms), max_speed_kmh: r1(maxKmh),
-    max_distance_m: r1(maxDist), is_crash: isCrash,
-    jamming_start_s: jStart ? r1(jStart) : null,
-    jamming_end_s:   jEnd   ? r1(jEnd)   : null,
-    spoof_time_s:    spoof  ? r1(spoof)  : null,
-    atti_times: attiTimes.slice(0,5).map(r1),
-    max_descent_ms: r1(Math.abs(Math.min(...m.z_ms))),
-    final_height_m: r1(m.h[m.h.length-1]||0),
-    min_battery_pct: r1(minBat||0),
-    start_dt: m.dtimes[0]||'', end_dt: m.dtimes[m.dtimes.length-1]||'',
-    flight_index: flightIndex,
-    flight_modes: usedModes,
-    compass_jumps: compassJumpIdx.length,
-    compass_jump_t: compassJumpIdx.map(i => m.t[i]),
-    spinning_detected: spinningDetected,
-    home_lat: m.lat[0] || null, home_lon: m.lon[0] || null,
-    final_lat: m.lat[m.lat.length-1] || null, final_lon: m.lon[m.lon.length-1] || null,
-  };
-}
+    function downloadNormalized() {
+      if (!rawCsvText || !fileName) return;
 
-function r1(v) { return Math.round(v*10)/10; }
+      // Re-parse original comma CSV properly (handles quoted fields, strips quotes)
+      // then join with ';' → exact Format 2 structure.
+      function parseRowComma(line) {
+        const result = [];
+        let cur = '', inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { inQ = !inQ; }
+          else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+          else { cur += ch; }
+        }
+        result.push(cur);
+        return result;
+      }
 
-function secToLocalStr(dtStr, sec) {
-  if (!dtStr || sec===null) return '—';
-  const m = dtStr.match(/(\d+)\.(\d+)\.(\d+)\s+(\d+):(\d+)/);
-  if (!m) return '—';
-  const d = new Date(+m[3],+m[2]-1,+m[1],+m[4]+2,+m[5],0);
-  d.setSeconds(d.getSeconds()+Math.round(sec));
-  return d.toTimeString().slice(0,8);
-}
+      function normDt(dt) {
+        dt = dt.trim();
+        const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+        if (!m) return dt;
+        return `${parseInt(m[3])}.${m[2]}.${m[1]} ${parseInt(m[4])}:${m[5]}`;
+      }
 
-// ── STATS CARDS ──────────────────────────────────────────────────────────
-function renderStats(s) {
-  const grid = document.getElementById('statsGrid');
-  const startLocal = secToLocalStr(s.start_dt, 0);
-  const endLocal   = secToLocalStr(s.start_dt, s.duration_s);
-  // Flight modes label + color
-  const modesLabel = (s.flight_modes && s.flight_modes.length)
-    ? s.flight_modes.join(' / ') : '—';
-  const modeColor  = s.flight_modes && s.flight_modes.includes('Sport') ? 'warn'
-                   : s.flight_modes && s.flight_modes.includes('Cine')  ? 'ok' : '';
+      const lines = rawCsvText.split(/\r?\n/).filter(l => l.trim());
+      const headers = parseRowComma(lines[0]).map(h => h.trim());
+      const dtCol = headers.indexOf('datetime(utc)');
 
-  const cards = [
-    { v: s.duration_s+'с',    l:'Тривалість польоту',  c:'' },
-    { v: s.max_height_m+'м',  l:'Макс. висота',         c:'' },
-    { v: s.max_distance_m+'м',l:'Макс. дистанція',      c:'' },
-    { v: s.max_speed_ms+' м/с', l:'Макс. швидкість', c: s.max_speed_kmh>100?'danger':'' },
-    { v: s.min_battery_pct+'%', l:'Мін. заряд АКБ',    c: s.min_battery_pct<20?'warn':'' },
-    { v: s.flight_index != null ? '#'+s.flight_index : '—', l:'Лічильник польотів (DJI)', c:'ok' },
-    { v: modesLabel,           l:'Режим польоту',        c: modeColor },
-    { v: s.spinning_detected ? '⚠ Спінінг' : s.compass_jumps > 0 ? s.compass_jumps+' стрибк.' : '✓ Норма',
-      l:'Компас', c: s.spinning_detected ? 'danger' : s.compass_jumps > 0 ? 'warn' : 'ok' },
-    { v: s.jamming_start_s ? s.jamming_start_s+'с' : '—', l:'Початок РЕБ-джамінгу', c: s.jamming_start_s?'warn':'' },
-    { v: s.spoof_time_s ? s.spoof_time_s+'с' : '—',       l:'GNSS-спуфінг',          c: s.spoof_time_s?'danger':'' },
-    { v: s.is_crash ? 'АВАРІЯ' : 'Норма',               l:'Статус завершення',      c: s.is_crash?'danger':'ok' },
-  ];
-  grid.innerHTML = cards.map(c =>
-    `<div class="stat-card"><div class="val ${c.c}">${c.v}</div><div class="lbl">${c.l}</div></div>`
-  ).join('');
-}
+      const outLines = [headers.join(';')];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseRowComma(lines[i]).map(c => c.trim());
+        if (dtCol >= 0 && dtCol < cols.length) cols[dtCol] = normDt(cols[dtCol]);
+        outLines.push(cols.join(';'));
+      }
 
-// ── COORD BLOCK ──────────────────────────────────────────────────────────
-function renderCoords(s) {
-  const block = document.getElementById('coordBlock');
-  const validCoord = (lat, lon) => lat && lon && !(lat === 0 && lon === 0);
-  const takeoffTime = secToLocalStr(s.start_dt, 0);
-  const landingTime = secToLocalStr(s.start_dt, s.duration_s);
-
-  function coordCard(id, title, lat, lon, timeStr) {
-    const el = document.getElementById(id);
-    const timeHtml = timeStr && timeStr !== '—'
-      ? `<div class="coord-time">${timeStr} UTC+2</div>` : '';
-    if (!validCoord(lat, lon)) {
-      el.innerHTML = `<div class="coord-title">${title}</div>${timeHtml}<div style="color:var(--text-dim);font-size:12px">Координати недоступні</div>`;
-      return;
+      const bom = '\uFEFF'; // UTF-8 BOM — Excel відкриває файл правильно
+      const blob = new Blob([bom + outLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName.replace(/\.csv$/i, '_normalized.csv');
+      a.click();
+      URL.revokeObjectURL(url);
     }
-    const latF = lat.toFixed(7), lonF = lon.toFixed(7);
-    const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
-    el.innerHTML = `
+
+    // ── MISSION SELECTION ────────────────────────────────────────────────────
+    function selectMission(type) {
+      missionType = type;
+      document.getElementById('btnLoss').className = 'mission-btn' + (type === 'ВТРАТА' ? ' selected-loss' : '');
+      document.getElementById('btnDamage').className = 'mission-btn' + (type === 'ПОШКОДЖЕННЯ' ? ' selected-damage' : '');
+      checkAnalyzeBtn();
+    }
+
+    // ── FIRMWARE / ANTISPOOF ─────────────────────────────────────────────────
+    function selectFirmware(val) {
+      firmware1001 = val;
+      document.getElementById('btnHas1001').className =
+        'mission-btn' + (val === 'є' ? ' selected-has' : '');
+      document.getElementById('btnNo1001').className =
+        'mission-btn' + (val === 'немає' ? ' selected-none' : '');
+
+      const row = document.getElementById('antispoofRow');
+      if (val === 'є') {
+        row.classList.add('visible');
+      } else {
+        row.classList.remove('visible');
+        antispoof = null;
+        document.getElementById('btnActivated').className = 'mission-btn';
+        document.getElementById('btnNotActivated').className = 'mission-btn';
+      }
+      checkAnalyzeBtn();
+    }
+
+    function selectAntispoof(val) {
+      antispoof = val;
+      document.getElementById('btnActivated').className =
+        'mission-btn' + (val === 'активовано' ? ' selected-active' : '');
+      document.getElementById('btnNotActivated').className =
+        'mission-btn' + (val === 'не активовано' ? ' selected-notactive' : '');
+      checkAnalyzeBtn();
+    }
+
+    function checkAnalyzeBtn() {
+      const firmwareReady = firmware1001 !== null &&
+        (firmware1001 === 'немає' || antispoof !== null);
+      document.getElementById('analyzeBtn').disabled =
+        !(csvText && missionType && firmwareReady);
+    }
+
+    // ── CSV PARSER ───────────────────────────────────────────────────────────
+    function parseCSV(text) {
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (!lines.length) return [];
+      const headers = lines[0].split(';').map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const cols = line.split(';');
+        const row = {};
+        headers.forEach((h, j) => { row[h] = (cols[j] || '').trim(); });
+        return row;
+      });
+    }
+
+    const FEET_TO_M = 0.3048, MPH_TO_MS = 0.44704, MPH_TO_KMH = 1.60934;
+
+    function gv(row, ...keys) {
+      for (const k of keys) {
+        if (k in row) { const v = parseFloat(row[k]); if (!isNaN(v)) return v; }
+      }
+      return 0;
+    }
+
+    function extractMetrics(rows) {
+      const t = [], h = [], spd_ms = [], spd_kmh = [], dist = [], sats = [], bat = [];
+      const pitch = [], roll = [], hdg = [], lat = [], lon = [], z_ms = [], volt = [];
+      const states = [], msgs = [], dtimes = [], gpslvl = [];
+
+      for (const r of rows) {
+        t.push(gv(r, 'time(millisecond)') / 1000);
+        h.push(gv(r, 'height_above_takeoff(feet)') * FEET_TO_M);
+        const s = gv(r, 'speed(mph)');
+        spd_ms.push(s * MPH_TO_MS);
+        spd_kmh.push(s * MPH_TO_KMH);
+        dist.push(gv(r, 'distance(feet)') * FEET_TO_M);
+        sats.push(Math.round(gv(r, 'satellites')));
+        gpslvl.push(Math.round(gv(r, 'gpslevel')));
+        bat.push(gv(r, 'battery_percent'));
+        pitch.push(gv(r, ' pitch(degrees)', 'pitch(degrees)'));
+        roll.push(gv(r, ' roll(degrees)', 'roll(degrees)'));
+        hdg.push(gv(r, ' compass_heading(degrees)', 'compass_heading(degrees)'));
+        const la = parseFloat(r['latitude'] || ''), lo = parseFloat(r['longitude'] || '');
+        lat.push(isNaN(la) ? 0 : la);
+        lon.push(isNaN(lo) ? 0 : lo);
+        z_ms.push(gv(r, ' zSpeed(mph)', 'zSpeed(mph)') * MPH_TO_MS);
+        volt.push(gv(r, 'voltage(v)'));
+        states.push(r['flycState'] || '');
+        msgs.push(r['message'] || '');
+        dtimes.push(r['datetime(utc)'] || '');
+      }
+      return { t, h, spd_ms, spd_kmh, dist, sats, gpslvl, bat, pitch, roll, hdg, lat, lon, z_ms, volt, states, msgs, dtimes };
+    }
+
+    function buildSummary(m) {
+      const t = m.t;
+      if (!t.length) return {};
+      const maxH = Math.max(...m.h), maxSms = Math.max(...m.spd_ms);
+      const maxKmh = Math.max(...m.spd_kmh), maxDist = Math.max(...m.dist);
+      const duration = Math.max(...t);
+
+      let jStart = null, jEnd = null;
+      for (let i = 0; i < t.length; i++) {
+        if (t[i] > 5 && m.sats[i] === 0 && jStart === null) jStart = t[i];
+        if (jStart && m.sats[i] > 0 && t[i] > jStart && jEnd === null) jEnd = t[i];
+      }
+      let spoof = null;
+      for (let i = 0; i < t.length; i++) {
+        if (t[i] > 10 && Math.abs(m.lat[i]) < 1 && Math.abs(m.lon[i]) < 1) { spoof = t[i]; break; }
+      }
+      const attiTimes = [];
+      let lastA = -999;
+      for (let i = 0; i < t.length; i++) {
+        if (m.states[i].toUpperCase().includes('ATTI') && t[i] - lastA > 5) { attiTimes.push(t[i]); lastA = t[i]; }
+      }
+      const allMsgs = m.msgs.join(' ').toLowerCase();
+      const isCrash = ['shock', 'crash', 'exiting gps'].some(w => allMsgs.includes(w));
+      const minBat = Math.min(...m.bat.filter(b => b > 0));
+
+      // Compass anomalies: heading jumps >60° per step (100ms)
+      const compassJumpIdx = [];
+      for (let i = 1; i < m.hdg.length; i++) {
+        let diff = Math.abs(m.hdg[i] - m.hdg[i - 1]);
+        if (diff > 180) diff = 360 - diff;
+        if (diff > 60) compassJumpIdx.push(i);
+      }
+      // Spinning: ≥3 jumps within any 3-second window
+      let spinningDetected = false;
+      for (let i = 0; i < compassJumpIdx.length - 2; i++) {
+        const tStart = m.t[compassJumpIdx[i]];
+        const tEnd = m.t[compassJumpIdx[i + 2]];
+        if (tEnd - tStart <= 3) { spinningDetected = true; break; }
+      }
+
+      // Data Recorder File Index
+      let flightIndex = null;
+      for (const msg of m.msgs) {
+        const match = msg.match(/Data Recorder File Index is (\d+)/);
+        if (match) { flightIndex = parseInt(match[1]); break; }
+      }
+
+      // Flight modes used
+      const MODE_MAP = {
+        'sport': 'Sport', 'cine': 'Cine', 'p-gps': 'Normal',
+        'opti': 'Normal', 'atti': 'ATTI'
+      };
+      const usedModes = [];
+      for (const st of m.states) {
+        const lc = st.toLowerCase();
+        for (const [key, label] of Object.entries(MODE_MAP)) {
+          if (lc.includes(key) && !usedModes.includes(label)) usedModes.push(label);
+        }
+      }
+
+      return {
+        duration_s: r1(duration), max_height_m: r1(maxH),
+        max_speed_ms: r1(maxSms), max_speed_kmh: r1(maxKmh),
+        max_distance_m: r1(maxDist), is_crash: isCrash,
+        jamming_start_s: jStart ? r1(jStart) : null,
+        jamming_end_s: jEnd ? r1(jEnd) : null,
+        spoof_time_s: spoof ? r1(spoof) : null,
+        atti_times: attiTimes.slice(0, 5).map(r1),
+        max_descent_ms: r1(Math.abs(Math.min(...m.z_ms))),
+        final_height_m: r1(m.h[m.h.length - 1] || 0),
+        min_battery_pct: r1(minBat || 0),
+        start_dt: m.dtimes[0] || '', end_dt: m.dtimes[m.dtimes.length - 1] || '',
+        flight_index: flightIndex,
+        flight_modes: usedModes,
+        compass_jumps: compassJumpIdx.length,
+        compass_jump_t: compassJumpIdx.map(i => m.t[i]),
+        spinning_detected: spinningDetected,
+        home_lat: m.lat[0] || null, home_lon: m.lon[0] || null,
+        final_lat: m.lat[m.lat.length - 1] || null, final_lon: m.lon[m.lon.length - 1] || null,
+      };
+    }
+
+    function r1(v) { return Math.round(v * 10) / 10; }
+
+    function secToLocalStr(dtStr, sec) {
+      if (!dtStr || sec === null) return '—';
+      const m = dtStr.match(/(\d+)\.(\d+)\.(\d+)\s+(\d+):(\d+)/);
+      if (!m) return '—';
+      const d = new Date(+m[3], +m[2] - 1, +m[1], +m[4] + 2, +m[5], 0);
+      d.setSeconds(d.getSeconds() + Math.round(sec));
+      return d.toTimeString().slice(0, 8);
+    }
+
+    // ── STATS CARDS ──────────────────────────────────────────────────────────
+    function renderStats(s) {
+      const grid = document.getElementById('statsGrid');
+      const startLocal = secToLocalStr(s.start_dt, 0);
+      const endLocal = secToLocalStr(s.start_dt, s.duration_s);
+      // Flight modes label + color
+      const modesLabel = (s.flight_modes && s.flight_modes.length)
+        ? s.flight_modes.join(' / ') : '—';
+      const modeColor = s.flight_modes && s.flight_modes.includes('Sport') ? 'warn'
+        : s.flight_modes && s.flight_modes.includes('Cine') ? 'ok' : '';
+
+      const cards = [
+        { v: s.duration_s + 'с', l: 'Тривалість польоту', c: '' },
+        { v: s.max_height_m + 'м', l: 'Макс. висота', c: '' },
+        { v: s.max_distance_m + 'м', l: 'Макс. дистанція', c: '' },
+        { v: s.max_speed_ms + ' м/с', l: 'Макс. швидкість', c: s.max_speed_kmh > 100 ? 'danger' : '' },
+        { v: s.min_battery_pct + '%', l: 'Мін. заряд АКБ', c: s.min_battery_pct < 20 ? 'warn' : '' },
+        { v: s.flight_index != null ? '#' + s.flight_index : '—', l: 'Лічильник польотів (DJI)', c: 'ok' },
+        { v: modesLabel, l: 'Режим польоту', c: modeColor },
+        {
+          v: s.spinning_detected ? '⚠ Спінінг' : s.compass_jumps > 0 ? s.compass_jumps + ' стрибк.' : '✓ Норма',
+          l: 'Компас', c: s.spinning_detected ? 'danger' : s.compass_jumps > 0 ? 'warn' : 'ok'
+        },
+        { v: s.jamming_start_s ? s.jamming_start_s + 'с' : '—', l: 'Початок РЕБ-джамінгу', c: s.jamming_start_s ? 'warn' : '' },
+        { v: s.spoof_time_s ? s.spoof_time_s + 'с' : '—', l: 'GNSS-спуфінг', c: s.spoof_time_s ? 'danger' : '' },
+        { v: s.is_crash ? 'АВАРІЯ' : 'Норма', l: 'Статус завершення', c: s.is_crash ? 'danger' : 'ok' },
+      ];
+      grid.innerHTML = cards.map(c =>
+        `<div class="stat-card"><div class="val ${c.c}">${c.v}</div><div class="lbl">${c.l}</div></div>`
+      ).join('');
+    }
+
+    // ── COORD BLOCK ──────────────────────────────────────────────────────────
+    function renderCoords(s) {
+      const block = document.getElementById('coordBlock');
+      const validCoord = (lat, lon) => lat && lon && !(lat === 0 && lon === 0);
+      const takeoffTime = secToLocalStr(s.start_dt, 0);
+      const landingTime = secToLocalStr(s.start_dt, s.duration_s);
+
+      function coordCard(id, title, lat, lon, timeStr) {
+        const el = document.getElementById(id);
+        const timeHtml = timeStr && timeStr !== '—'
+          ? `<div class="coord-time">${timeStr} UTC+2</div>` : '';
+        if (!validCoord(lat, lon)) {
+          el.innerHTML = `<div class="coord-title">${title}</div>${timeHtml}<div style="color:var(--text-dim);font-size:12px">Координати недоступні</div>`;
+          return;
+        }
+        const latF = lat.toFixed(7), lonF = lon.toFixed(7);
+        const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
+        el.innerHTML = `
       <div class="coord-title">${title}</div>
       ${timeHtml}
       <div class="coord-val">${latF}, ${lonF}</div>
       <a class="map-link" href="${gmUrl}" target="_blank" rel="noopener">Відкрити в Google Maps ↗</a>`;
-    el._lat = lat; el._lon = lon;  // store for prediction tab auto-fill
-  }
+        el._lat = lat; el._lon = lon;  // store for prediction tab auto-fill
+      }
 
-  coordCard('coordHome',  'Домашня точка (зліт)',     s.home_lat,  s.home_lon,  takeoffTime);
-  coordCard('coordFinal', 'Фінальна точка (посадка)', s.final_lat, s.final_lon, landingTime);
-  block.style.display = 'block';
-}
+      coordCard('coordHome', 'Домашня точка (зліт)', s.home_lat, s.home_lon, takeoffTime);
+      coordCard('coordFinal', 'Фінальна точка (посадка)', s.final_lat, s.final_lon, landingTime);
+      block.style.display = 'block';
+    }
 
-// ── EVENTS TABLE ─────────────────────────────────────────────────────────
-function renderEvents(m, s) {
-  const ev = [];
-  ev.push({ t:0, type:'ok', desc:'Зліт. Початок місії.' });
-  if (s.jamming_start_s) ev.push({ t:s.jamming_start_s, type:'reb',
-    desc:`Початок РЕБ-джамінгу. Кількість супутників впала до 0.` });
-  if (s.atti_times.length) ev.push({ t:s.atti_times[0], type:'atti',
-    desc:`Перехід у режим ATTI (керування без GPS-стабілізації).` });
-  if (s.spoof_time_s) ev.push({ t:s.spoof_time_s, type:'spoof',
-    desc:`GNSS-спуфінг — координати обнулено (0,0). Аномальне прискорення до ${s.max_speed_kmh} км/год.` });
-  if (s.jamming_end_s) ev.push({ t:s.jamming_end_s, type:'reb',
-    desc:`Відновлення GPS-сигналу після джамінгу.` });
-  if (s.spinning_detected && s.compass_jump_t && s.compass_jump_t.length)
-    ev.push({ t: s.compass_jump_t[0], type:'spoof',
-      desc:`Виявлено спінінг — ${s.compass_jumps} різких стрибків компаса (>60°/крок). Можливе падіння або механічне руйнування.` });
+    // ── EVENTS TABLE ─────────────────────────────────────────────────────────
+    function renderEvents(m, s) {
+      const ev = [];
+      ev.push({ t: 0, type: 'ok', desc: 'Зліт. Початок місії.' });
+      if (s.jamming_start_s) ev.push({
+        t: s.jamming_start_s, type: 'reb',
+        desc: `Початок РЕБ-джамінгу. Кількість супутників впала до 0.`
+      });
+      if (s.atti_times.length) ev.push({
+        t: s.atti_times[0], type: 'atti',
+        desc: `Перехід у режим ATTI (керування без GPS-стабілізації).`
+      });
+      if (s.spoof_time_s) ev.push({
+        t: s.spoof_time_s, type: 'spoof',
+        desc: `GNSS-спуфінг — координати обнулено (0,0). Аномальне прискорення до ${s.max_speed_kmh} км/год.`
+      });
+      if (s.jamming_end_s) ev.push({
+        t: s.jamming_end_s, type: 'reb',
+        desc: `Відновлення GPS-сигналу після джамінгу.`
+      });
+      if (s.spinning_detected && s.compass_jump_t && s.compass_jump_t.length)
+        ev.push({
+          t: s.compass_jump_t[0], type: 'spoof',
+          desc: `Виявлено спінінг — ${s.compass_jumps} різких стрибків компаса (>60°/крок). Можливе падіння або механічне руйнування.`
+        });
 
-  const seen=new Set();
-  m.msgs.forEach((msg,i) => {
-    if (!msg||seen.has(msg)||msg.length<4) return;
-    seen.add(msg);
-    const ml=msg.toLowerCase();
-    const type = ml.includes('shock')?'spoof' : ml.includes('gps')||ml.includes('error')?'reb' : ml.includes('atti')?'atti' : 'ok';
-    ev.push({ t:m.t[i], type, desc:msg.slice(0,140) });
-  });
+      const seen = new Set();
+      m.msgs.forEach((msg, i) => {
+        if (!msg || seen.has(msg) || msg.length < 4) return;
+        seen.add(msg);
+        const ml = msg.toLowerCase();
+        const type = ml.includes('shock') ? 'spoof' : ml.includes('gps') || ml.includes('error') ? 'reb' : ml.includes('atti') ? 'atti' : 'ok';
+        ev.push({ t: m.t[i], type, desc: msg.slice(0, 140) });
+      });
 
-  ev.sort((a,b)=>a.t-b.t);
-  const bMap={reb:'badge-reb',spoof:'badge-spoof',atti:'badge-atti',ok:'badge-ok'};
-  const lMap={reb:'РЕБ',spoof:'Спуфінг',atti:'ATTI',ok:'Штатно'};
+      ev.sort((a, b) => a.t - b.t);
+      const bMap = { reb: 'badge-reb', spoof: 'badge-spoof', atti: 'badge-atti', ok: 'badge-ok' };
+      const lMap = { reb: 'РЕБ', spoof: 'Спуфінг', atti: 'ATTI', ok: 'Штатно' };
 
-  document.getElementById('eventsBody').innerHTML = ev.map(e => `
+      document.getElementById('eventsBody').innerHTML = ev.map(e => `
     <tr>
       <td class="t-cell">${r1(e.t)}</td>
       <td class="t-cell">${secToLocalStr(m.dtimes[0], e.t)}</td>
       <td><span class="badge ${bMap[e.type]}">${lMap[e.type]}</span></td>
       <td>${e.desc}</td>
     </tr>`
-  ).join('');
-}
-
-// ── CHARTS ───────────────────────────────────────────────────────────────
-// Base Plotly layout — uses fonts that render Cyrillic correctly
-const BASE = {
-  paper_bgcolor:'rgba(0,0,0,0)',
-  plot_bgcolor:'rgba(0,0,0,0)',
-  font:{ family:'"Noto Sans","Arial Unicode MS",Arial,sans-serif', color:'#9ca3af', size:11 },
-  margin:{ l:50, r:14, t:8, b:40 },
-  xaxis:{ gridcolor:'#252a35', zerolinecolor:'#252a35',
-          title:{ text:'t, s', font:{size:11} }, tickfont:{size:10} },
-  yaxis:{ gridcolor:'#252a35', zerolinecolor:'#252a35', tickfont:{size:10} },
-  showlegend:false,
-  hovermode:'x unified',
-  hoverlabel:{
-    bgcolor:'#111318',
-    bordercolor:'#2a2f3a',
-    font:{ color:'#c8cdd6', family:'Arial,sans-serif', size:12 }
-  },
-};
-const CFG = { responsive:true, displayModeBar:false };
-
-function annoShapes(s) {
-  const shapes=[], annots=[];
-  const j = s.jamming_start_s, sp = s.spoof_time_s;
-  // If both exist and are within 30s of each other → mirror sides to avoid overlap
-  const tooClose = j && sp && Math.abs(j - sp) < 30;
-
-  if (j) {
-    shapes.push({ type:'line', x0:j, x1:j, y0:0, y1:1, yref:'paper',
-      line:{color:'#ff6b35', width:1.5, dash:'dash'} });
-    annots.push({
-      x:j, y:0.98, yref:'paper', yanchor:'top',
-      // When close: РЕБ label goes LEFT of its line
-      xanchor: tooClose ? 'right' : 'left',
-      text: tooClose ? 'РЕБ ◀' : '▶ РЕБ',
-      showarrow:false,
-      font:{color:'#ff6b35', size:10, family:'Arial,sans-serif'},
-      bgcolor:'rgba(10,12,16,0.82)', borderpad:3
-    });
-  }
-  if (sp) {
-    shapes.push({ type:'line', x0:sp, x1:sp, y0:0, y1:1, yref:'paper',
-      line:{color:'#ff3355', width:2, dash:'dot'} });
-    annots.push({
-      x:sp, y:0.98, yref:'paper', yanchor:'top',
-      // Spoof label always goes RIGHT of its line
-      xanchor:'left',
-      text:'▶ Spoof',
-      showarrow:false,
-      font:{color:'#ff3355', size:10, family:'Arial,sans-serif'},
-      bgcolor:'rgba(10,12,16,0.82)', borderpad:3
-    });
-  }
-  return { shapes, annotations:annots };
-}
-
-function lay(extra, s) {
-  const { shapes, annotations } = annoShapes(s);
-  return Object.assign({}, BASE, { shapes, annotations }, extra);
-}
-
-function renderCharts(m, s) {
-  const t = m.t;
-
-  // 1. Height
-  Plotly.newPlot('chartHeight', [{
-    x:t, y:m.h, type:'scatter', mode:'lines', name:'Висота, м',
-    line:{color:'#00d4aa',width:2}, fill:'tozeroy', fillcolor:'rgba(0,212,170,.08)'
-  }], lay({ yaxis:{...BASE.yaxis, title:{text:'м',font:{size:11}}} }, s), CFG);
-
-  // 2. Speed
-  Plotly.newPlot('chartSpeed', [{
-    x:t, y:m.spd_ms, type:'scatter', mode:'lines', name:'Швидкiсть',
-    line:{color:'#0099ff',width:2}
-  }], lay({ yaxis:{...BASE.yaxis, title:{text:'м/с',font:{size:11}}} }, s), CFG);
-
-  // 3. Distance
-  Plotly.newPlot('chartDist', [{
-    x:t, y:m.dist, type:'scatter', mode:'lines', name:'Дистанцiя',
-    line:{color:'#a78bfa',width:2}
-  }], lay({ yaxis:{...BASE.yaxis, title:{text:'м',font:{size:11}}} }, s), CFG);
-
-  // 4. Satellites
-  Plotly.newPlot('chartSats', [{
-    x:t, y:m.sats, type:'bar', name:'Супутники',
-    marker:{ color: m.sats.map(v => v===0?'#ff3355':v<6?'#ff6b35':'#22c55e') }
-  }], lay({ yaxis:{...BASE.yaxis, title:{text:'шт',font:{size:11}}} }, s), CFG);
-
-  // 4b. GNSS quality (gpslevel 0-5 bars + satellites line, dual-axis)
-  const gpsColors = {
-    0: '#ff3355', // немає сигналу
-    1: '#ff6b35', // дуже слабкий
-    2: '#f59e0b', // слабкий
-    3: '#facc15', // задовільний
-    4: '#22c55e', // хороший
-    5: '#00d4aa', // відмінний
-  };
-  const gpsLabels = {
-    0:'Немає (0)', 1:'Дуже слабкий (1)', 2:'Слабкий (2)',
-    3:'Задовільний (3)', 4:'Хороший (4)', 5:'Відмінний (5)'
-  };
-  const { shapes: gnssShapes, annotations: gnssAnnots } = annoShapes(s);
-  Plotly.newPlot('chartGnss', [
-    {
-      x: t, y: m.gpslvl, type: 'bar', name: 'Рівень GNSS',
-      marker: { color: m.gpslvl.map(v => gpsColors[v] ?? '#374151') },
-      hovertemplate: '%{customdata}<extra></extra>',
-      customdata: m.gpslvl.map(v => gpsLabels[v] ?? v),
-      yaxis: 'y'
-    },
-    {
-      x: t, y: m.sats, type: 'scatter', mode: 'lines', name: 'Супутники',
-      line: { color: 'rgba(255,255,255,0.35)', width: 1.5, dash: 'dot' },
-      hovertemplate: '%{y} сат.<extra></extra>',
-      yaxis: 'y2'
+      ).join('');
     }
-  ], {
-    ...BASE,
-    bargap: 0,
-    showlegend: true,
-    legend: { bgcolor:'rgba(0,0,0,0)', font:{size:11,color:'#9ca3af'},
-              orientation:'h', x:0, y:1.12 },
-    yaxis: {
-      ...BASE.yaxis,
-      title: { text:'Рівень (0–5)', font:{size:11} },
-      range: [0, 5.4],
-      tickvals: [0,1,2,3,4,5],
-      ticktext: ['0 Немає','1','2','3','4','5 Відмінно'],
-    },
-    yaxis2: {
-      ...BASE.yaxis,
-      title: { text:'Супутники', font:{size:11} },
-      overlaying: 'y', side: 'right',
-      showgrid: false,
-      tickfont: { size:10, color:'rgba(255,255,255,0.3)' }
-    },
-    shapes: gnssShapes,
-    annotations: gnssAnnots
-  }, CFG);
 
-  // 5. Battery
-  Plotly.newPlot('chartBat', [{
-    x:t, y:m.bat, type:'scatter', mode:'lines', name:'АКБ',
-    line:{color:'#f59e0b',width:2}, fill:'tozeroy', fillcolor:'rgba(245,158,11,.08)'
-  }], lay({
-    yaxis:{...BASE.yaxis, range:[0,105], title:{text:'%',font:{size:11}}}
-  }, s), CFG);
+    // ── CHARTS ───────────────────────────────────────────────────────────────
+    // Base Plotly layout — uses fonts that render Cyrillic correctly
+    const BASE = {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      font: { family: '"Noto Sans","Arial Unicode MS",Arial,sans-serif', color: '#9ca3af', size: 11 },
+      margin: { l: 50, r: 14, t: 8, b: 40 },
+      xaxis: {
+        gridcolor: '#252a35', zerolinecolor: '#252a35',
+        title: { text: 't, s', font: { size: 11 } }, tickfont: { size: 10 }
+      },
+      yaxis: { gridcolor: '#252a35', zerolinecolor: '#252a35', tickfont: { size: 10 } },
+      showlegend: false,
+      hovermode: 'x unified',
+      hoverlabel: {
+        bgcolor: '#111318',
+        bordercolor: '#2a2f3a',
+        font: { color: '#c8cdd6', family: 'Arial,sans-serif', size: 12 }
+      },
+    };
+    const CFG = { responsive: true, displayModeBar: false };
 
-  // 6. Pitch/Roll
-  Plotly.newPlot('chartAttitude', [
-    { x:t, y:m.pitch, type:'scatter', mode:'lines', name:'Pitch',
-      line:{color:'#f472b6',width:1.5} },
-    { x:t, y:m.roll,  type:'scatter', mode:'lines', name:'Roll',
-      line:{color:'#fb923c',width:1.5} }
-  ], lay({
-    showlegend:true,
-    legend:{bgcolor:'rgba(0,0,0,0)', font:{size:11, color:'#9ca3af'}},
-    yaxis:{...BASE.yaxis, title:{text:'градуси',font:{size:11}}}
-  }, s), CFG);
+    function annoShapes(s) {
+      const shapes = [], annots = [];
+      const j = s.jamming_start_s, sp = s.spoof_time_s;
+      // If both exist and are within 30s of each other → mirror sides to avoid overlap
+      const tooClose = j && sp && Math.abs(j - sp) < 30;
 
-  // 7. Vertical speed
-  Plotly.newPlot('chartVspeed', [{
-    x:t, y:m.z_ms, type:'scatter', mode:'lines', name:'Верт. швидкiсть',
-    line:{color:'#38bdf8',width:1.5}, fill:'tozeroy', fillcolor:'rgba(56,189,248,.06)'
-  }], lay({ yaxis:{...BASE.yaxis, title:{text:'м/с',font:{size:11}}} }, s), CFG);
-
-  // 8. Voltage
-  Plotly.newPlot('chartVolt', [{
-    x:t, y:m.volt, type:'scatter', mode:'lines', name:'Напруга',
-    line:{color:'#fbbf24',width:1.5}
-  }], lay({ yaxis:{...BASE.yaxis, title:{text:'В',font:{size:11}}} }, s), CFG);
-
-  // 9. Compass heading + anomaly markers
-  const jumpIdx = s.compass_jump_t || [];
-  const jumpSet = new Set(jumpIdx.map(v => Math.round(v * 10)));
-  Plotly.newPlot('chartCompass', [
-    {
-      x: t, y: m.hdg, type: 'scatter', mode: 'lines', name: 'Курс',
-      line: { color: '#a78bfa', width: 1.5 }
-    },
-    {
-      x: jumpIdx,
-      y: jumpIdx.map(jt => { const i = t.findIndex(v => Math.round(v*10) === Math.round(jt*10)); return i>=0 ? m.hdg[i] : null; }),
-      type: 'scatter', mode: 'markers', name: 'Аномалія',
-      marker: { color: '#ff3355', size: 8, symbol: 'x' },
-      hovertemplate: 'Стрибок компаса %{x:.1f}с<extra></extra>'
+      if (j) {
+        shapes.push({
+          type: 'line', x0: j, x1: j, y0: 0, y1: 1, yref: 'paper',
+          line: { color: '#ff6b35', width: 1.5, dash: 'dash' }
+        });
+        annots.push({
+          x: j, y: 0.98, yref: 'paper', yanchor: 'top',
+          // When close: РЕБ label goes LEFT of its line
+          xanchor: tooClose ? 'right' : 'left',
+          text: tooClose ? 'РЕБ ◀' : '▶ РЕБ',
+          showarrow: false,
+          font: { color: '#ff6b35', size: 10, family: 'Arial,sans-serif' },
+          bgcolor: 'rgba(10,12,16,0.82)', borderpad: 3
+        });
+      }
+      if (sp) {
+        shapes.push({
+          type: 'line', x0: sp, x1: sp, y0: 0, y1: 1, yref: 'paper',
+          line: { color: '#ff3355', width: 2, dash: 'dot' }
+        });
+        annots.push({
+          x: sp, y: 0.98, yref: 'paper', yanchor: 'top',
+          // Spoof label always goes RIGHT of its line
+          xanchor: 'left',
+          text: '▶ Spoof',
+          showarrow: false,
+          font: { color: '#ff3355', size: 10, family: 'Arial,sans-serif' },
+          bgcolor: 'rgba(10,12,16,0.82)', borderpad: 3
+        });
+      }
+      return { shapes, annotations: annots };
     }
-  ], lay({
-    yaxis: { ...BASE.yaxis, range:[0,360], tickvals:[0,90,180,270,360],
-             ticktext:['0° Пн','90° Сх','180° Пд','270° Зх','360°'],
-             title:{text:'Курс °',font:{size:11}} },
-    showlegend: true,
-    legend:{ bgcolor:'rgba(0,0,0,0)', font:{size:11,color:'#9ca3af'} }
-  }, s), CFG);
 
-  // 10. Flight state (categorical bar)
-  const stateMap = { 'P-GPS':3, 'ATTI':2, 'Motors_Started':1, 'Assisted_Takeoff':1 };
-  const stateNums = m.states.map(st => {
-    for (const k in stateMap) if (st.includes(k)) return stateMap[k];
-    return 0;
-  });
-  const stateColors = stateNums.map(n =>
-    n===3?'#22c55e' : n===2?'#0099ff' : n===1?'#f59e0b' : '#374151'
-  );
-  const { shapes:sh2, annotations:an2 } = annoShapes(s);
-  Plotly.newPlot('chartState', [{
-    x:t, y:stateNums, type:'bar', name:'Режим',
-    marker:{color:stateColors},
-    hovertemplate:'%{customdata}<extra></extra>',
-    customdata:m.states
-  }], {
-    ...BASE,
-    yaxis:{ ...BASE.yaxis, tickvals:[0,1,2,3],
-            ticktext:['—','Takeoff','ATTI','P-GPS'], fixedrange:true },
-    bargap:0, shapes:sh2, annotations:an2
-  }, CFG);
-
-  // 10. Trajectory map
-  const validIdx = m.lat.map((_,i) => Math.abs(m.lat[i])>1 && Math.abs(m.lon[i])>1 ? i : -1).filter(i=>i>=0);
-  const mLat = validIdx.map(i=>m.lat[i]);
-  const mLon = validIdx.map(i=>m.lon[i]);
-  const mH   = validIdx.map(i=>m.h[i]);
-  const mT   = validIdx.map(i=>m.t[i]);
-
-  const traces = [{
-    type:'scattermapbox', lat:mLat, lon:mLon, mode:'lines+markers',
-    line:{color:'#00d4aa',width:2},
-    marker:{ size:4, color:mH, colorscale:'Viridis',
-      colorbar:{ title:{text:'Висота, м',font:{size:11,color:'#9ca3af'}},
-        thickness:10, len:0.6, tickfont:{color:'#9ca3af'} } },
-    text:mT.map((ti,i)=>`t=${ti}c  H=${mH[i].toFixed(1)}м`),
-    hovertemplate:'%{text}<extra></extra>', name:'Маршрут'
-  }];
-  if (mLat.length) {
-    traces.push({ type:'scattermapbox', lat:[mLat[0]], lon:[mLon[0]],
-      mode:'markers', marker:{size:13,color:'#22c55e'}, name:'Зліт',
-      hovertemplate:'Зліт<extra></extra>' });
-    traces.push({ type:'scattermapbox', lat:[mLat[mLat.length-1]], lon:[mLon[mLon.length-1]],
-      mode:'markers', marker:{size:14,color:'#ff3355',symbol:'star'}, name:'Кінець',
-      hovertemplate:'Кінець польоту<extra></extra>' });
-  }
-  const cLat = mLat.reduce((a,b)=>a+b,0)/(mLat.length||1);
-  const cLon = mLon.reduce((a,b)=>a+b,0)/(mLon.length||1);
-
-  Plotly.newPlot('chartMap', traces, {
-    paper_bgcolor:'rgba(0,0,0,0)',
-    font:{family:'Arial,sans-serif', color:'#9ca3af'},
-    hoverlabel:{ bgcolor:'#111318', bordercolor:'#2a2f3a',
-                 font:{color:'#c8cdd6', family:'Arial,sans-serif', size:12} },
-    mapbox:{ style:'carto-darkmatter', center:{lat:cLat, lon:cLon}, zoom:14 },
-    margin:{l:0,r:0,t:0,b:0},
-    showlegend:true,
-    legend:{bgcolor:'rgba(17,19,24,.85)', font:{color:'#9ca3af',size:11}}
-  }, { ...CFG, mapboxAccessToken:'' });
-}
-
-// ── AI ANALYSIS ──────────────────────────────────────────────────────────
-async function runAnalysis() {
-  if (!missionType) { showError('Оберіть тип місії (ВТРАТА або ПОШКОДЖЕННЯ)'); return; }
-  if (!csvText)     { showError('Спочатку завантажте CSV-файл'); return; }
-
-  document.getElementById('analyzeBtn').disabled = true;
-  document.getElementById('loader').classList.add('visible');
-  showError('');
-
-  try {
-    const res = await fetch('/analyze', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        csv: csvText,
-        mission_type: missionType,
-        filename: fileName,
-        firmware_1001: firmware1001,
-        antispoof_active: firmware1001 === 'є' ? antispoof : null
-      })
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-
-    document.getElementById('messengerText').textContent = data.messenger || '';
-    document.getElementById('reportText').textContent    = data.report    || '';
-    if (data.summary) renderStats(data.summary);
-
-    // Scroll to messenger block
-    document.querySelector('.messenger-block').scrollIntoView({ behavior:'smooth', block:'start' });
-
-  } catch(e) {
-    showError('Помилка: ' + e.message);
-  } finally {
-    document.getElementById('loader').classList.remove('visible');
-    document.getElementById('analyzeBtn').disabled = false;
-  }
-}
-
-// ── UTILS ────────────────────────────────────────────────────────────────
-function copyMessenger() {
-  const text = document.getElementById('messengerText').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('copyBtn');
-    btn.textContent = '✓ Скопійовано';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Копіювати'; btn.classList.remove('copied'); }, 2500);
-  });
-}
-
-function toggleSection(header) {
-  header.classList.toggle('collapsed');
-  header.nextElementSibling.classList.toggle('hidden');
-}
-
-function showError(msg) {
-  const box = document.getElementById('errorBox');
-  box.textContent = msg;
-  box.classList.toggle('visible', !!msg);
-}
-
-function resetAll() {
-  csvText = ''; rawCsvText = ''; metrics = {}; fileName = '';
-  missionType = null; firmware1001 = null; antispoof = null;
-  predChartsRendered = false;
-  switchTab('tabAnalysis');
-  const hc = document.getElementById('predHomeCoords');
-  if (hc) { hc.value = ''; hc.style.borderColor = ''; }
-  const ph = document.getElementById('predCoordsHint');
-  if (ph) ph.textContent = '';
-  fileInput.value = '';
-  document.getElementById('fileInfo').classList.remove('visible');
-  document.getElementById('formatBadge').textContent = '';
-  document.getElementById('formatBadge').className = 'badge-format';
-  document.getElementById('dlNormBtn').classList.remove('visible');
-  document.getElementById('btnLoss').className        = 'mission-btn';
-  document.getElementById('btnDamage').className      = 'mission-btn';
-  document.getElementById('btnHas1001').className     = 'mission-btn';
-  document.getElementById('btnNo1001').className      = 'mission-btn';
-  document.getElementById('btnActivated').className   = 'mission-btn';
-  document.getElementById('btnNotActivated').className= 'mission-btn';
-  document.getElementById('antispoofRow').classList.remove('visible');
-  checkAnalyzeBtn();
-  showError('');
-  document.getElementById('results').classList.remove('visible');
-  document.getElementById('loader').classList.remove('visible');
-  document.getElementById('messengerText').textContent = '';
-  document.getElementById('reportText').textContent    = '';
-}
-
-function fmtSize(bytes) {
-  if (bytes < 1024) return bytes + ' Б';
-  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' КБ';
-  return (bytes/1048576).toFixed(2) + ' МБ';
-}
-
-// ── TABS ─────────────────────────────────────────────────────────
-let predChartsRendered = false;
-
-function switchTab(id) {
-  ['tabAnalysis','tabPredict'].forEach(tid => {
-    document.getElementById(tid).classList.toggle('active', tid === id);
-  });
-  ['rtabAnalysis','rtabPredict'].forEach(bid => {
-    const panel = bid.replace('rtab','tab');
-    document.getElementById(bid).classList.toggle('active', panel === id);
-  });
-  // Render prediction charts the first time the tab is opened
-  if (id === 'tabPredict' && !predChartsRendered && metrics && metrics.t && metrics.t.length) {
-    renderPredictionCharts(metrics);
-    predChartsRendered = true;
-    // Pre-fill home coords if available
-    const homeEl = document.getElementById('coordHome');
-    if (homeEl && homeEl._lat) {
-      const val = `${homeEl._lat.toFixed(7)}, ${homeEl._lon.toFixed(7)}`;
-      document.getElementById('predHomeCoords').value = val;
-      parseHomeCoords(val);
+    function lay(extra, s) {
+      const { shapes, annotations } = annoShapes(s);
+      return Object.assign({}, BASE, { shapes, annotations }, extra);
     }
-  }
-}
 
-// Parse free-form coord string → {lat, lon} or null
-function parseLatLon(str) {
-  if (!str) return null;
-  // Normalise: replace comma+spaces or just spaces as separator
-  const parts = str.trim().replace(/,\s*/g, ' ').split(/\s+/);
-  if (parts.length < 2) return null;
-  const lat = parseFloat(parts[0]), lon = parseFloat(parts[1]);
-  if (isNaN(lat) || isNaN(lon)) return null;
-  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
-  return { lat, lon };
-}
+    function renderCharts(m, s) {
+      const t = m.t;
 
-function parseHomeCoords(val) {
-  const hint = document.getElementById('predCoordsHint');
-  const input = document.getElementById('predHomeCoords');
-  const parsed = parseLatLon(val);
-  if (parsed) {
-    hint.textContent = `✓ ${parsed.lat.toFixed(5)}, ${parsed.lon.toFixed(5)}`;
-    hint.style.color = 'var(--green)';
-    input.style.borderColor = 'var(--green)';
-  } else if (val.trim()) {
-    hint.textContent = '✗ не розпізнано';
-    hint.style.color = 'var(--danger)';
-    input.style.borderColor = 'var(--danger)';
-  } else {
-    hint.textContent = '';
-    input.style.borderColor = '';
-  }
-}
+      // 1. Height
+      Plotly.newPlot('chartHeight', [{
+        x: t, y: m.h, type: 'scatter', mode: 'lines', name: 'Висота, м',
+        line: { color: '#00d4aa', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(0,212,170,.08)'
+      }], lay({ yaxis: { ...BASE.yaxis, title: { text: 'м', font: { size: 11 } } } }, s), CFG);
 
-function fillPredFromAnalysis() {
-  if (!metrics || !metrics.lat) return;
-  for (let i = 0; i < metrics.lat.length; i++) {
-    if (Math.abs(metrics.lat[i]) > 0.01 && Math.abs(metrics.lon[i]) > 0.01) {
-      const val = `${metrics.lat[i].toFixed(7)}, ${metrics.lon[i].toFixed(7)}`;
-      document.getElementById('predHomeCoords').value = val;
-      parseHomeCoords(val);
-      break;
+      // 2. Speed
+      Plotly.newPlot('chartSpeed', [{
+        x: t, y: m.spd_ms, type: 'scatter', mode: 'lines', name: 'Швидкiсть',
+        line: { color: '#0099ff', width: 2 }
+      }], lay({ yaxis: { ...BASE.yaxis, title: { text: 'м/с', font: { size: 11 } } } }, s), CFG);
+
+      // 3. Distance
+      Plotly.newPlot('chartDist', [{
+        x: t, y: m.dist, type: 'scatter', mode: 'lines', name: 'Дистанцiя',
+        line: { color: '#a78bfa', width: 2 }
+      }], lay({ yaxis: { ...BASE.yaxis, title: { text: 'м', font: { size: 11 } } } }, s), CFG);
+
+      // 4. Satellites
+      Plotly.newPlot('chartSats', [{
+        x: t, y: m.sats, type: 'bar', name: 'Супутники',
+        marker: { color: m.sats.map(v => v === 0 ? '#ff3355' : v < 6 ? '#ff6b35' : '#22c55e') }
+      }], lay({ yaxis: { ...BASE.yaxis, title: { text: 'шт', font: { size: 11 } } } }, s), CFG);
+
+      // 4b. GNSS quality (gpslevel 0-5 bars + satellites line, dual-axis)
+      const gpsColors = {
+        0: '#ff3355', // немає сигналу
+        1: '#ff6b35', // дуже слабкий
+        2: '#f59e0b', // слабкий
+        3: '#facc15', // задовільний
+        4: '#22c55e', // хороший
+        5: '#00d4aa', // відмінний
+      };
+      const gpsLabels = {
+        0: 'Немає (0)', 1: 'Дуже слабкий (1)', 2: 'Слабкий (2)',
+        3: 'Задовільний (3)', 4: 'Хороший (4)', 5: 'Відмінний (5)'
+      };
+      const { shapes: gnssShapes, annotations: gnssAnnots } = annoShapes(s);
+      Plotly.newPlot('chartGnss', [
+        {
+          x: t, y: m.gpslvl, type: 'bar', name: 'Рівень GNSS',
+          marker: { color: m.gpslvl.map(v => gpsColors[v] ?? '#374151') },
+          hovertemplate: '%{customdata}<extra></extra>',
+          customdata: m.gpslvl.map(v => gpsLabels[v] ?? v),
+          yaxis: 'y'
+        },
+        {
+          x: t, y: m.sats, type: 'scatter', mode: 'lines', name: 'Супутники',
+          line: { color: 'rgba(255,255,255,0.35)', width: 1.5, dash: 'dot' },
+          hovertemplate: '%{y} сат.<extra></extra>',
+          yaxis: 'y2'
+        }
+      ], {
+        ...BASE,
+        bargap: 0,
+        showlegend: true,
+        legend: {
+          bgcolor: 'rgba(0,0,0,0)', font: { size: 11, color: '#9ca3af' },
+          orientation: 'h', x: 0, y: 1.12
+        },
+        yaxis: {
+          ...BASE.yaxis,
+          title: { text: 'Рівень (0–5)', font: { size: 11 } },
+          range: [0, 5.4],
+          tickvals: [0, 1, 2, 3, 4, 5],
+          ticktext: ['0 Немає', '1', '2', '3', '4', '5 Відмінно'],
+        },
+        yaxis2: {
+          ...BASE.yaxis,
+          title: { text: 'Супутники', font: { size: 11 } },
+          overlaying: 'y', side: 'right',
+          showgrid: false,
+          tickfont: { size: 10, color: 'rgba(255,255,255,0.3)' }
+        },
+        shapes: gnssShapes,
+        annotations: gnssAnnots
+      }, CFG);
+
+      // 5. Battery
+      Plotly.newPlot('chartBat', [{
+        x: t, y: m.bat, type: 'scatter', mode: 'lines', name: 'АКБ',
+        line: { color: '#f59e0b', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(245,158,11,.08)'
+      }], lay({
+        yaxis: { ...BASE.yaxis, range: [0, 105], title: { text: '%', font: { size: 11 } } }
+      }, s), CFG);
+
+      // 6. Pitch/Roll
+      Plotly.newPlot('chartAttitude', [
+        {
+          x: t, y: m.pitch, type: 'scatter', mode: 'lines', name: 'Pitch',
+          line: { color: '#f472b6', width: 1.5 }
+        },
+        {
+          x: t, y: m.roll, type: 'scatter', mode: 'lines', name: 'Roll',
+          line: { color: '#fb923c', width: 1.5 }
+        }
+      ], lay({
+        showlegend: true,
+        legend: { bgcolor: 'rgba(0,0,0,0)', font: { size: 11, color: '#9ca3af' } },
+        yaxis: { ...BASE.yaxis, title: { text: 'градуси', font: { size: 11 } } }
+      }, s), CFG);
+
+      // 7. Vertical speed
+      Plotly.newPlot('chartVspeed', [{
+        x: t, y: m.z_ms, type: 'scatter', mode: 'lines', name: 'Верт. швидкiсть',
+        line: { color: '#38bdf8', width: 1.5 }, fill: 'tozeroy', fillcolor: 'rgba(56,189,248,.06)'
+      }], lay({ yaxis: { ...BASE.yaxis, title: { text: 'м/с', font: { size: 11 } } } }, s), CFG);
+
+      // 8. Voltage
+      Plotly.newPlot('chartVolt', [{
+        x: t, y: m.volt, type: 'scatter', mode: 'lines', name: 'Напруга',
+        line: { color: '#fbbf24', width: 1.5 }
+      }], lay({ yaxis: { ...BASE.yaxis, title: { text: 'В', font: { size: 11 } } } }, s), CFG);
+
+      // 9. Compass heading + anomaly markers
+      const jumpIdx = s.compass_jump_t || [];
+      const jumpSet = new Set(jumpIdx.map(v => Math.round(v * 10)));
+      Plotly.newPlot('chartCompass', [
+        {
+          x: t, y: m.hdg, type: 'scatter', mode: 'lines', name: 'Курс',
+          line: { color: '#a78bfa', width: 1.5 }
+        },
+        {
+          x: jumpIdx,
+          y: jumpIdx.map(jt => { const i = t.findIndex(v => Math.round(v * 10) === Math.round(jt * 10)); return i >= 0 ? m.hdg[i] : null; }),
+          type: 'scatter', mode: 'markers', name: 'Аномалія',
+          marker: { color: '#ff3355', size: 8, symbol: 'x' },
+          hovertemplate: 'Стрибок компаса %{x:.1f}с<extra></extra>'
+        }
+      ], lay({
+        yaxis: {
+          ...BASE.yaxis, range: [0, 360], tickvals: [0, 90, 180, 270, 360],
+          ticktext: ['0° Пн', '90° Сх', '180° Пд', '270° Зх', '360°'],
+          title: { text: 'Курс °', font: { size: 11 } }
+        },
+        showlegend: true,
+        legend: { bgcolor: 'rgba(0,0,0,0)', font: { size: 11, color: '#9ca3af' } }
+      }, s), CFG);
+
+      // 10. Flight state (categorical bar)
+      const stateMap = { 'P-GPS': 3, 'ATTI': 2, 'Motors_Started': 1, 'Assisted_Takeoff': 1 };
+      const stateNums = m.states.map(st => {
+        for (const k in stateMap) if (st.includes(k)) return stateMap[k];
+        return 0;
+      });
+      const stateColors = stateNums.map(n =>
+        n === 3 ? '#22c55e' : n === 2 ? '#0099ff' : n === 1 ? '#f59e0b' : '#374151'
+      );
+      const { shapes: sh2, annotations: an2 } = annoShapes(s);
+      Plotly.newPlot('chartState', [{
+        x: t, y: stateNums, type: 'bar', name: 'Режим',
+        marker: { color: stateColors },
+        hovertemplate: '%{customdata}<extra></extra>',
+        customdata: m.states
+      }], {
+        ...BASE,
+        yaxis: {
+          ...BASE.yaxis, tickvals: [0, 1, 2, 3],
+          ticktext: ['—', 'Takeoff', 'ATTI', 'P-GPS'], fixedrange: true
+        },
+        bargap: 0, shapes: sh2, annotations: an2
+      }, CFG);
+
+      // 10. Trajectory map
+      const validIdx = m.lat.map((_, i) => Math.abs(m.lat[i]) > 1 && Math.abs(m.lon[i]) > 1 ? i : -1).filter(i => i >= 0);
+      const mLat = validIdx.map(i => m.lat[i]);
+      const mLon = validIdx.map(i => m.lon[i]);
+      const mH = validIdx.map(i => m.h[i]);
+      const mT = validIdx.map(i => m.t[i]);
+
+      const traces = [{
+        type: 'scattermapbox', lat: mLat, lon: mLon, mode: 'lines+markers',
+        line: { color: '#00d4aa', width: 2 },
+        marker: {
+          size: 4, color: mH, colorscale: 'Viridis',
+          colorbar: {
+            title: { text: 'Висота, м', font: { size: 11, color: '#9ca3af' } },
+            thickness: 10, len: 0.6, tickfont: { color: '#9ca3af' }
+          }
+        },
+        text: mT.map((ti, i) => `t=${ti}c  H=${mH[i].toFixed(1)}м`),
+        hovertemplate: '%{text}<extra></extra>', name: 'Маршрут'
+      }];
+      if (mLat.length) {
+        traces.push({
+          type: 'scattermapbox', lat: [mLat[0]], lon: [mLon[0]],
+          mode: 'markers', marker: { size: 13, color: '#22c55e' }, name: 'Зліт',
+          hovertemplate: 'Зліт<extra></extra>'
+        });
+        traces.push({
+          type: 'scattermapbox', lat: [mLat[mLat.length - 1]], lon: [mLon[mLon.length - 1]],
+          mode: 'markers', marker: { size: 14, color: '#ff3355', symbol: 'star' }, name: 'Кінець',
+          hovertemplate: 'Кінець польоту<extra></extra>'
+        });
+      }
+      const cLat = mLat.reduce((a, b) => a + b, 0) / (mLat.length || 1);
+      const cLon = mLon.reduce((a, b) => a + b, 0) / (mLon.length || 1);
+
+      Plotly.newPlot('chartMap', traces, {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: { family: 'Arial,sans-serif', color: '#9ca3af' },
+        hoverlabel: {
+          bgcolor: '#111318', bordercolor: '#2a2f3a',
+          font: { color: '#c8cdd6', family: 'Arial,sans-serif', size: 12 }
+        },
+        mapbox: { style: 'carto-darkmatter', center: { lat: cLat, lon: cLon }, zoom: 14 },
+        margin: { l: 0, r: 0, t: 0, b: 0 },
+        showlegend: true,
+        legend: { bgcolor: 'rgba(17,19,24,.85)', font: { color: '#9ca3af', size: 11 } }
+      }, { ...CFG, mapboxAccessToken: '' });
     }
-  }
-}
 
-function windPresetChange() {
-  const sel = document.getElementById('predWindPreset');
-  if (sel.value && sel.value !== 'custom') {
-    document.getElementById('predWindDir').value = sel.value;
-  }
-}
+    // ── AI ANALYSIS ──────────────────────────────────────────────────────────
+    async function runAnalysis() {
+      if (!missionType) { showError('Оберіть тип місії (ВТРАТА або ПОШКОДЖЕННЯ)'); return; }
+      if (!csvText) { showError('Спочатку завантажте CSV-файл'); return; }
 
-// ── PREDICTION CHARTS ─────────────────────────────────────────────
-function renderPredictionCharts(m) {
-  const t   = m.t;
-  const CFG = { displayModeBar: false, responsive: true };
+      document.getElementById('analyzeBtn').disabled = true;
+      document.getElementById('loader').classList.add('visible');
+      showError('');
 
-  // Thin line style shared by all pred charts
-  const pl = (extra) => Object.assign({}, {
-    paper_bgcolor:'#1a1d24', plot_bgcolor:'#1a1d24',
-    font:{ color:'#c8cdd6', size:11 },
-    margin:{l:46,r:12,t:8,b:36},
-    xaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
-            title:{text:'час (с)',font:{size:10}}, tickfont:{size:10} },
-    yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a', tickfont:{size:10} },
-    hoverlabel:{ bgcolor:'#111318', bordercolor:'#2a2f3a',
-                 font:{color:'#c8cdd6', family:'Arial,sans-serif', size:12} },
-    showlegend: false,
-  }, extra);
+      try {
+        const res = await fetch('/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            csv: csvText,
+            mission_type: missionType,
+            filename: fileName,
+            firmware_1001: firmware1001,
+            antispoof_active: firmware1001 === 'є' ? antispoof : null
+          })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
 
-  // 1. Height
-  Plotly.newPlot('predChartHeight', [{
-    x:t, y:m.h, type:'scatter', mode:'lines',
-    line:{color:'#00d4aa', width:2}, fill:'tozeroy', fillcolor:'rgba(0,212,170,.08)'
-  }], pl({ yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
-                   title:{text:'м', font:{size:10}}, tickfont:{size:10} } }), CFG);
+        document.getElementById('messengerText').textContent = data.messenger || '';
+        document.getElementById('reportText').textContent = data.report || '';
+        if (data.summary) renderStats(data.summary);
 
-  // 2. Horizontal speed
-  Plotly.newPlot('predChartSpeed', [{
-    x:t, y:m.spd_ms, type:'scatter', mode:'lines', line:{color:'#0099ff',width:2}
-  }], pl({ yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
-                   title:{text:'м/с',font:{size:10}}, tickfont:{size:10} } }), CFG);
+        // Scroll to messenger block
+        document.querySelector('.messenger-block').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // 3. Vertical speed
-  Plotly.newPlot('predChartVspeed', [{
-    x:t, y:m.z_ms, type:'scatter', mode:'lines',
-    line:{color:'#f59e0b',width:2}
-  }], pl({ yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
-                   title:{text:'м/с',font:{size:10}}, tickfont:{size:10} } }), CFG);
-
-  // 4. Compass with anomaly markers (same logic as main chart)
-  const compassData = [{
-    x:t, y:m.hdg, type:'scatter', mode:'lines', name:'Курс',
-    line:{color:'#a78bfa',width:2}
-  }];
-  // Compute jumps for markers
-  const jumpX=[], jumpY=[];
-  for (let i=1;i<m.hdg.length;i++){
-    let d=Math.abs(m.hdg[i]-m.hdg[i-1]); if(d>180) d=360-d;
-    if(d>60){jumpX.push(t[i]);jumpY.push(m.hdg[i]);}
-  }
-  if (jumpX.length) compassData.push({
-    x:jumpX, y:jumpY, mode:'markers', name:'Аномалія',
-    marker:{color:'#ff3355', size:8, symbol:'x'}
-  });
-  Plotly.newPlot('predChartCompass', compassData, pl({
-    showlegend: jumpX.length > 0,
-    legend:{bgcolor:'rgba(0,0,0,0)',font:{color:'#c8cdd6',size:10}},
-    yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
-            title:{text:'°',font:{size:10}}, tickfont:{size:10},
-            tickvals:[0,45,90,135,180,225,270,315,360],
-            ticktext:['N','NE','E','SE','S','SW','W','NW','N'] }
-  }), CFG);
-
-  // 5. Pitch / Roll
-  Plotly.newPlot('predChartAttitude', [
-    { x:t, y:m.pitch, type:'scatter', mode:'lines', name:'Pitch', line:{color:'#f97316',width:2} },
-    { x:t, y:m.roll,  type:'scatter', mode:'lines', name:'Roll',  line:{color:'#8b5cf6',width:2} },
-  ], pl({
-    showlegend:true,
-    legend:{bgcolor:'rgba(0,0,0,0)',font:{color:'#c8cdd6',size:10}},
-    yaxis:{ gridcolor:'#2a2f3a', zerolinecolor:'#2a2f3a',
-            title:{text:'°',font:{size:10}}, tickfont:{size:10} }
-  }), CFG);
-}
-
-// ── DEAD RECKONING ────────────────────────────────────────────────
-// Integrates heading × speed × dt from last valid GPS onwards.
-// Wind is NOT added here — telemetry ground speed already reflects actual movement.
-// Wind drift is calculated only for the uncontrolled fall phase (done by AI).
-function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs) {
-  const { t, lat, lon, spd_ms, hdg } = m;
-
-  // Find last valid GPS fix (non-zero, non-spoofed)
-  let lastValidIdx = -1, baseLat = homeLat, baseLon = homeLon;
-  for (let i = 0; i < lat.length; i++) {
-    if (Math.abs(lat[i]) > 0.01 && Math.abs(lon[i]) > 0.01) {
-      lastValidIdx = i;
-      baseLat = lat[i];
-      baseLon = lon[i];
+      } catch (e) {
+        showError('Помилка: ' + e.message);
+      } finally {
+        document.getElementById('loader').classList.remove('visible');
+        document.getElementById('analyzeBtn').disabled = false;
+      }
     }
-  }
 
-  const noGps    = lastValidIdx < 0;           // entire flight without GPS
-  const startIdx = noGps ? 0 : lastValidIdx;   // integrate from GPS-loss point (or start)
-  let drLat = baseLat, drLon = baseLon, drDistOwn = 0;
-  const drTimeSecs = t.length > startIdx ? t[t.length - 1] - t[startIdx] : 0;
+    // ── UTILS ────────────────────────────────────────────────────────────────
+    function copyMessenger() {
+      const text = document.getElementById('messengerText').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✓ Скопійовано';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Копіювати'; btn.classList.remove('copied'); }, 2500);
+      });
+    }
 
-  for (let i = startIdx; i < t.length - 1; i++) {
-    const dt = t[i + 1] - t[i];
-    if (dt <= 0 || dt > 10) continue;
+    function toggleSection(header) {
+      header.classList.toggle('collapsed');
+      header.nextElementSibling.classList.toggle('hidden');
+    }
 
-    const hdgRad = ((hdg[i] || 0) * Math.PI) / 180;
-    const spd    = Math.max(0, spd_ms[i] || 0);
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      box.textContent = msg;
+      box.classList.toggle('visible', !!msg);
+    }
 
-    const latRad = drLat * Math.PI / 180;
-    drLat += (spd * Math.cos(hdgRad) * dt) / 111320;
-    drLon += (spd * Math.sin(hdgRad) * dt) / (111320 * Math.cos(latRad));
-    drDistOwn += spd * dt;
-  }
+    function resetAll() {
+      csvText = ''; rawCsvText = ''; metrics = {}; fileName = '';
+      missionType = null; firmware1001 = null; antispoof = null;
+      predChartsRendered = false;
+      switchTab('tabAnalysis');
+      const hc = document.getElementById('predHomeCoords');
+      if (hc) { hc.value = ''; hc.style.borderColor = ''; }
+      const ph = document.getElementById('predCoordsHint');
+      if (ph) ph.textContent = '';
+      fileInput.value = '';
+      document.getElementById('fileInfo').classList.remove('visible');
+      document.getElementById('formatBadge').textContent = '';
+      document.getElementById('formatBadge').className = 'badge-format';
+      document.getElementById('dlNormBtn').classList.remove('visible');
+      document.getElementById('btnLoss').className = 'mission-btn';
+      document.getElementById('btnDamage').className = 'mission-btn';
+      document.getElementById('btnHas1001').className = 'mission-btn';
+      document.getElementById('btnNo1001').className = 'mission-btn';
+      document.getElementById('btnActivated').className = 'mission-btn';
+      document.getElementById('btnNotActivated').className = 'mission-btn';
+      document.getElementById('antispoofRow').classList.remove('visible');
+      checkAnalyzeBtn();
+      showError('');
+      document.getElementById('results').classList.remove('visible');
+      document.getElementById('loader').classList.remove('visible');
+      document.getElementById('messengerText').textContent = '';
+      document.getElementById('reportText').textContent = '';
+    }
 
-  return {
-    lat:              drLat,
-    lon:              drLon,
-    last_valid_lat:   baseLat,
-    last_valid_lon:   baseLon,
-    last_valid_t:     noGps ? null : Math.round(t[lastValidIdx]),
-    no_gps:           noGps,
-    dist_own_m:       Math.round(drDistOwn),
-    wind_to_deg:      Math.round((windDirDeg + 180) % 360),
-    dr_duration_s:    Math.round(drTimeSecs),
-    steps_integrated: t.length - startIdx,
-  };
-}
+    function fmtSize(bytes) {
+      if (bytes < 1024) return bytes + ' Б';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' КБ';
+      return (bytes / 1048576).toFixed(2) + ' МБ';
+    }
 
-// ── RUN PREDICTION ────────────────────────────────────────────────
-async function runPrediction() {
-  const errBox = document.getElementById('predErrorBox');
-  errBox.textContent = '';
-  errBox.classList.remove('visible');
+    // ── TABS ─────────────────────────────────────────────────────────
+    let predChartsRendered = false;
 
-  if (!metrics || !metrics.t || !metrics.t.length) {
-    errBox.textContent = 'Спочатку завантажте та проаналізуйте лог-файл.';
-    errBox.classList.add('visible'); return;
-  }
-  const homeCoords = parseLatLon(document.getElementById('predHomeCoords').value);
-  if (!homeCoords) {
-    errBox.textContent = 'Введіть координати стартової точки у будь-якому форматі, наприклад: 47.9078, 29.2017';
-    errBox.classList.add('visible'); return;
-  }
-  const homeLat = homeCoords.lat;
-  const homeLon = homeCoords.lon;
-  const windDir = parseFloat(document.getElementById('predWindDir').value  || 0);
-  const windSpd = parseFloat(document.getElementById('predWindSpeed').value || 0);
+    function switchTab(id) {
+      ['tabAnalysis', 'tabPredict'].forEach(tid => {
+        document.getElementById(tid).classList.toggle('active', tid === id);
+      });
+      ['rtabAnalysis', 'rtabPredict'].forEach(bid => {
+        const panel = bid.replace('rtab', 'tab');
+        document.getElementById(bid).classList.toggle('active', panel === id);
+      });
+      // Render prediction charts the first time the tab is opened
+      if (id === 'tabPredict' && !predChartsRendered && metrics && metrics.t && metrics.t.length) {
+        renderPredictionCharts(metrics);
+        predChartsRendered = true;
+        // Pre-fill home coords if available
+        const homeEl = document.getElementById('coordHome');
+        if (homeEl && homeEl._lat) {
+          const val = `${homeEl._lat.toFixed(7)}, ${homeEl._lon.toFixed(7)}`;
+          document.getElementById('predHomeCoords').value = val;
+          parseHomeCoords(val);
+        }
+      }
+    }
 
-  // ── Pre-compute dead reckoning in browser (integrates full telemetry) ──
-  const dr = computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd);
+    // Parse free-form coord string → {lat, lon} or null
+    function parseLatLon(str) {
+      if (!str) return null;
+      // Normalise: replace comma+spaces or just spaces as separator
+      const parts = str.trim().replace(/,\s*/g, ' ').split(/\s+/);
+      if (parts.length < 2) return null;
+      const lat = parseFloat(parts[0]), lon = parseFloat(parts[1]);
+      if (isNaN(lat) || isNaN(lon)) return null;
+      if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+      return { lat, lon };
+    }
 
-  // ── Flight summary: last-moment values + post-GPS statistics ──
-  const last = (arr) => arr[arr.length - 1] || 0;
-  const avgArr = (arr) => arr.length ? arr.reduce((a,b) => a+b, 0) / arr.length : 0;
+    function parseHomeCoords(val) {
+      const hint = document.getElementById('predCoordsHint');
+      const input = document.getElementById('predHomeCoords');
+      const parsed = parseLatLon(val);
+      if (parsed) {
+        hint.textContent = `✓ ${parsed.lat.toFixed(5)}, ${parsed.lon.toFixed(5)}`;
+        hint.style.color = 'var(--green)';
+        input.style.borderColor = 'var(--green)';
+      } else if (val.trim()) {
+        hint.textContent = '✗ не розпізнано';
+        hint.style.color = 'var(--danger)';
+        input.style.borderColor = 'var(--danger)';
+      } else {
+        hint.textContent = '';
+        input.style.borderColor = '';
+      }
+    }
 
-  // Post-GPS-loss segment indices
-  const postGpsIdx = dr.steps_integrated > 0
-    ? Math.max(0, metrics.t.length - dr.steps_integrated) : 0;
-  const postHdg  = metrics.hdg.slice(postGpsIdx);
-  const postSpd  = metrics.spd_ms.slice(postGpsIdx);
-  const postZ    = metrics.z_ms.slice(postGpsIdx);
+    function fillPredFromAnalysis() {
+      if (!metrics || !metrics.lat) return;
+      for (let i = 0; i < metrics.lat.length; i++) {
+        if (Math.abs(metrics.lat[i]) > 0.01 && Math.abs(metrics.lon[i]) > 0.01) {
+          const val = `${metrics.lat[i].toFixed(7)}, ${metrics.lon[i].toFixed(7)}`;
+          document.getElementById('predHomeCoords').value = val;
+          parseHomeCoords(val);
+          break;
+        }
+      }
+    }
 
-  // Circular mean for heading (avoids 359°/1° wrap issue)
-  function circMeanDeg(degs) {
-    if (!degs.length) return 0;
-    const sc = degs.reduce((a,d) => { a.s += Math.sin(d*Math.PI/180); a.c += Math.cos(d*Math.PI/180); return a; }, {s:0,c:0});
-    return ((Math.atan2(sc.s/degs.length, sc.c/degs.length) * 180/Math.PI) + 360) % 360;
-  }
+    function windPresetChange() {
+      const sel = document.getElementById('predWindPreset');
+      if (sel.value && sel.value !== 'custom') {
+        document.getElementById('predWindDir').value = sel.value;
+      }
+    }
 
-  // Last 10 points
-  const n10 = Math.min(10, metrics.t.length);
-  const avgLast10 = (arr) => arr.slice(-n10).reduce((a,b) => a+b, 0) / n10;
+    // ── PREDICTION CHARTS ─────────────────────────────────────────────
+    function renderPredictionCharts(m) {
+      const t = m.t;
+      const CFG = { displayModeBar: false, responsive: true };
 
-  const flightSummary = {
-    flight_duration_s:       Math.round(last(metrics.t)),
-    max_height_m:            +Math.max(...metrics.h).toFixed(1),
-    last_height_m:           +last(metrics.h).toFixed(1),
-    last_vspeed_ms:          +last(metrics.z_ms).toFixed(2),
-    last_hspeed_ms:          +avgLast10(metrics.spd_ms).toFixed(2),
-    last_heading_deg:        +avgLast10(metrics.hdg).toFixed(1),
-    last_pitch_deg:          +last(metrics.pitch).toFixed(1),
-    last_roll_deg:           +last(metrics.roll).toFixed(1),
-    // Post-GPS-loss averages (full segment — overall direction of travel)
-    post_gps_avg_hdg_deg:    +circMeanDeg(postHdg).toFixed(1),
-    post_gps_avg_spd_ms:     +avgArr(postSpd).toFixed(2),
-    post_gps_avg_vspeed_ms:  +avgArr(postZ).toFixed(2),
-    post_gps_duration_s:     dr.dr_duration_s,
-  };
+      // Thin line style shared by all pred charts
+      const pl = (extra) => Object.assign({}, {
+        paper_bgcolor: '#1a1d24', plot_bgcolor: '#1a1d24',
+        font: { color: '#c8cdd6', size: 11 },
+        margin: { l: 46, r: 12, t: 8, b: 36 },
+        xaxis: {
+          gridcolor: '#2a2f3a', zerolinecolor: '#2a2f3a',
+          title: { text: 'час (с)', font: { size: 10 } }, tickfont: { size: 10 }
+        },
+        yaxis: { gridcolor: '#2a2f3a', zerolinecolor: '#2a2f3a', tickfont: { size: 10 } },
+        hoverlabel: {
+          bgcolor: '#111318', bordercolor: '#2a2f3a',
+          font: { color: '#c8cdd6', family: 'Arial,sans-serif', size: 12 }
+        },
+        showlegend: false,
+      }, extra);
 
-  document.getElementById('predLoader').classList.add('show');
-  document.getElementById('predBtn').disabled = true;
-  document.getElementById('predResult').classList.remove('show');
+      // 1. Height
+      Plotly.newPlot('predChartHeight', [{
+        x: t, y: m.h, type: 'scatter', mode: 'lines',
+        line: { color: '#00d4aa', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(0,212,170,.08)'
+      }], pl({
+        yaxis: {
+          gridcolor: '#2a2f3a', zerolinecolor: '#2a2f3a',
+          title: { text: 'м', font: { size: 10 } }, tickfont: { size: 10 }
+        }
+      }), CFG);
 
-  try {
-    const res = await fetch('/predict', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        dead_reckoning:  dr,
-        flight_summary:  flightSummary,
-        home_lat:        homeLat,
-        home_lon:        homeLon,
-        wind_dir_deg:    windDir,
-        wind_speed_ms:   windSpd,
-        filename:        fileName,
-      })
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+      // 2. Horizontal speed
+      Plotly.newPlot('predChartSpeed', [{
+        x: t, y: m.spd_ms, type: 'scatter', mode: 'lines', line: { color: '#0099ff', width: 2 }
+      }], pl({
+        yaxis: {
+          gridcolor: '#2a2f3a', zerolinecolor: '#2a2f3a',
+          title: { text: 'м/с', font: { size: 10 } }, tickfont: { size: 10 }
+        }
+      }), CFG);
 
-    // Render result
-    const card = document.getElementById('predCoordsCard');
-    // DR info line
-    const drInfo = dr.no_gps
-      ? `<div style="font-size:11px;color:var(--warn);margin-top:8px;line-height:1.7">
-          ⚠ <b>Політ без GPS</b> — dead reckoning від стартової точки (вся телеметрія, ${dr.dr_duration_s}с, ${dr.dist_own_m}м).
-          Похибка може бути значною. 💨 Вітер враховано при падінні (${windSpd} м/с → ${dr.wind_to_deg}°)
+      // 3. Vertical speed
+      Plotly.newPlot('predChartVspeed', [{
+        x: t, y: m.z_ms, type: 'scatter', mode: 'lines',
+        line: { color: '#f59e0b', width: 2 }
+      }], pl({
+        yaxis: {
+          gridcolor: '#2a2f3a', zerolinecolor: '#2a2f3a',
+          title: { text: 'м/с', font: { size: 10 } }, tickfont: { size: 10 }
+        }
+      }), CFG);
+
+      // 4. Compass with anomaly markers (same logic as main chart)
+      const compassData = [{
+        x: t, y: m.hdg, type: 'scatter', mode: 'lines', name: 'Курс',
+        line: { color: '#a78bfa', width: 2 }
+      }];
+      // Compute jumps for markers
+      const jumpX = [], jumpY = [];
+      for (let i = 1; i < m.hdg.length; i++) {
+        let d = Math.abs(m.hdg[i] - m.hdg[i - 1]); if (d > 180) d = 360 - d;
+        if (d > 60) { jumpX.push(t[i]); jumpY.push(m.hdg[i]); }
+      }
+      if (jumpX.length) compassData.push({
+        x: jumpX, y: jumpY, mode: 'markers', name: 'Аномалія',
+        marker: { color: '#ff3355', size: 8, symbol: 'x' }
+      });
+      Plotly.newPlot('predChartCompass', compassData, pl({
+        showlegend: jumpX.length > 0,
+        legend: { bgcolor: 'rgba(0,0,0,0)', font: { color: '#c8cdd6', size: 10 } },
+        yaxis: {
+          gridcolor: '#2a2f3a', zerolinecolor: '#2a2f3a',
+          title: { text: '°', font: { size: 10 } }, tickfont: { size: 10 },
+          tickvals: [0, 45, 90, 135, 180, 225, 270, 315, 360],
+          ticktext: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N']
+        }
+      }), CFG);
+
+      // 5. Pitch / Roll
+      Plotly.newPlot('predChartAttitude', [
+        { x: t, y: m.pitch, type: 'scatter', mode: 'lines', name: 'Pitch', line: { color: '#f97316', width: 2 } },
+        { x: t, y: m.roll, type: 'scatter', mode: 'lines', name: 'Roll', line: { color: '#8b5cf6', width: 2 } },
+      ], pl({
+        showlegend: true,
+        legend: { bgcolor: 'rgba(0,0,0,0)', font: { color: '#c8cdd6', size: 10 } },
+        yaxis: {
+          gridcolor: '#2a2f3a', zerolinecolor: '#2a2f3a',
+          title: { text: '°', font: { size: 10 } }, tickfont: { size: 10 }
+        }
+      }), CFG);
+    }
+
+    // ── PHYSICS-BASED SEARCH POINT CALCULATION ───────────────────────
+    // Vector navigation model ("treadmill" principle):
+    //   Phase 1 — Active flight: integrate GPS ground-speed telemetry to get
+    //             the incident point (where drone lost control / reached max height).
+    //             Ground-speed already encodes wind effect (GPS-derived).
+    //   Phase 2 — Free fall:  t_fall = H / v_descent (2.2 m/s default for Mavic).
+    //             Wind drift  = V_wind × t_fall  in the downwind direction.
+    //             Landing point = incident_point + wind_drift_vector.
+
+    // Returns index of the last height peak that precedes the final descent.
+    function findLastPeakBeforeDescent(h) {
+      const n = h.length;
+      if (n < 10) return 0;
+
+      // Smooth with a 10-sample window to remove sensor jitter
+      const W = 10;
+      const sm = h.map((_, i) => {
+        const lo = Math.max(0, i - W), hi = Math.min(n - 1, i + W);
+        let s = 0;
+        for (let j = lo; j <= hi; j++) s += (h[j] || 0);
+        return s / (hi - lo + 1);
+      });
+
+      // Minimum height in the final 30 % of the flight (the "landing zone")
+      const tailStart = Math.floor(n * 0.7);
+      let minTail = Infinity;
+      for (let i = tailStart; i < n; i++) minTail = Math.min(minTail, sm[i]);
+
+      // Scan backwards from 80 % to 20 % of flight to find the last local max
+      // that sits at least 10 m above the tail minimum.
+      const scanEnd = Math.floor(n * 0.8);
+      const scanStart = Math.floor(n * 0.2);
+      for (let i = scanEnd; i >= scanStart; i--) {
+        const isPeak = sm[i] >= sm[Math.max(0, i - 1)] && sm[i] >= sm[Math.min(n - 1, i + 1)];
+        if (isPeak && sm[i] - minTail >= 10) return i;
+      }
+
+      // Fallback: midpoint
+      return Math.floor(n / 2);
+    }
+
+    function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs) {
+      const { t, lat, lon, spd_ms, hdg } = m;
+      // Height above takeoff in metres
+      const h = m.h || m.alt || m.height || [];
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 1 — Find last valid GPS fix → incident (base) position
+      // ═══════════════════════════════════════════════════════════════
+      let lastValidIdx = -1, baseLat = homeLat, baseLon = homeLon;
+      for (let i = 0; i < lat.length; i++) {
+        if (Math.abs(lat[i]) > 0.01 && Math.abs(lon[i]) > 0.01) {
+          lastValidIdx = i;
+          baseLat = lat[i];
+          baseLon = lon[i];
+        }
+      }
+
+      const noGps = lastValidIdx < 0;
+      const startIdx = noGps ? 0 : lastValidIdx;
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 2 — Find the peak height index (incident altitude)
+      //   This is where the drone began its uncontrolled descent.
+      // ═══════════════════════════════════════════════════════════════
+      const peakIdxRaw = h.length >= 10 ? findLastPeakBeforeDescent(h) : t.length - 1;
+      const peakIdx = Math.max(startIdx, Math.min(peakIdxRaw, t.length - 1));
+
+      // Incident height (AGL, metres) at the peak / GPS-loss moment
+      const incidentH = (h.length > peakIdx && h[peakIdx] > 0) ? h[peakIdx]
+        : (h.length > startIdx ? (h[startIdx] || 0) : 0);
+      const peakT = t.length > peakIdx ? t[peakIdx] : t[startIdx];
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 3 — Active-flight integration (GPS ground-speed telemetry)
+      //
+      // "Treadmill" principle:
+      //   V_ground = V_drone_air + V_wind  (as vectors)
+      //   Because telemetry spd_ms is GPS-derived (i.e. ground speed),
+      //   the wind effect is ALREADY encoded — we simply integrate.
+      //   If wind > drone airspeed the GPS speed will reflect the drone
+      //   being blown backward (net ground speed in the wind direction).
+      // ═══════════════════════════════════════════════════════════════
+      let drLat = baseLat, drLon = baseLon, drDistOwn = 0;
+
+      for (let i = startIdx; i < peakIdx && i < t.length - 1; i++) {
+        const dt = t[i + 1] - t[i];
+        if (dt <= 0 || dt > 10) continue;
+        const hdgRad = ((hdg[i] || 0) * Math.PI) / 180;
+        const spd = Math.max(0, spd_ms[i] || 0);
+        const latRad = drLat * Math.PI / 180;
+        drLat += (spd * Math.cos(hdgRad) * dt) / 111320;
+        drLon += (spd * Math.sin(hdgRad) * dt) / (111320 * Math.cos(latRad));
+        drDistOwn += spd * dt;
+      }
+
+      // Incident position after active-flight integration
+      const incidentLat = drLat;
+      const incidentLon = drLon;
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 4 — Physics free-fall model
+      //
+      //   t_fall = H / v_descent
+      //     H          = incidentH (metres AGL)
+      //     v_descent  = measured descent rate if available, else 2.2 m/s
+      //                  (DJI Mavic auto-landing ~2.2 m/s; free-fall ~4–5 m/s)
+      //
+      //   Wind drift during fall:
+      //     distance = V_wind × t_fall  (metres)
+      //     direction = downwind = windDirDeg + 180°
+      //       (wind FROM 315° NW → drone drifts TOWARD 135° SE)
+      //
+      //   Final point = incident_point + drift_vector
+      // ═══════════════════════════════════════════════════════════════
+
+      // Use measured descent speed if sensible, otherwise default to 2.2 m/s
+      const z_ms = m.z_ms || [];
+      let measuredDescent = 0;
+      if (z_ms.length > peakIdx) {
+        // DJI z_ms: positive = up; descent is negative → invert
+        measuredDescent = -(z_ms[peakIdx] || 0);
+      }
+      const descentRate = (measuredDescent > 0.5 && measuredDescent < 10)
+        ? measuredDescent : 2.2;
+
+      // Free-fall time (seconds)
+      const fallTimeS = incidentH > 0 ? incidentH / descentRate : 0;
+
+      // Downwind azimuth: wind blows FROM windDirDeg → drift TOWARD windDirDeg + 180°
+      const downwindDeg = (windDirDeg + 180) % 360;
+      const downwindRad = downwindDeg * Math.PI / 180;
+
+      // Horizontal wind drift during free-fall
+      const windDriftM = windSpeedMs * fallTimeS;
+
+      // Apply drift vector to incident position
+      const latRad0 = incidentLat * Math.PI / 180;
+      drLat = incidentLat + (windDriftM * Math.cos(downwindRad)) / 111320;
+      drLon = incidentLon + (windDriftM * Math.sin(downwindRad)) / (111320 * Math.cos(latRad0));
+
+      // ═══════════════════════════════════════════════════════════════
+      // Return full detail for the AI prompt and the info card
+      // ═══════════════════════════════════════════════════════════════
+      const drTimeSecs = t.length > startIdx ? t[t.length - 1] - t[startIdx] : 0;
+
+      return {
+        // Final predicted landing point
+        lat: drLat,
+        lon: drLon,
+        // Last known GPS position
+        last_valid_lat: baseLat,
+        last_valid_lon: baseLon,
+        last_valid_t: noGps ? null : Math.round(t[lastValidIdx]),
+        no_gps: noGps,
+        dist_own_m: Math.round(drDistOwn),
+        // Wind vector info
+        wind_to_deg: Math.round(downwindDeg),
+        dr_duration_s: Math.round(drTimeSecs),
+        steps_integrated: t.length - startIdx,
+        // Incident (peak) info
+        incident_lat: incidentLat,
+        incident_lon: incidentLon,
+        incident_h_m: Math.round(incidentH),
+        // Free-fall physics
+        fall_time_s: +fallTimeS.toFixed(1),
+        descent_rate_ms: +descentRate.toFixed(2),
+        wind_drift_m: Math.round(windDriftM),
+        // Legacy aliases expected by AI prompt / result card
+        peak_lat: incidentLat,
+        peak_lon: incidentLon,
+        peak_h_m: Math.round(incidentH),
+        peak_t_s: Math.round(peakT),
+        fall_duration_s: Math.round(fallTimeS),
+      };
+    }
+
+    // ── RUN PREDICTION ────────────────────────────────────────────────
+    async function runPrediction() {
+      const errBox = document.getElementById('predErrorBox');
+      errBox.textContent = '';
+      errBox.classList.remove('visible');
+
+      if (!metrics || !metrics.t || !metrics.t.length) {
+        errBox.textContent = 'Спочатку завантажте та проаналізуйте лог-файл.';
+        errBox.classList.add('visible'); return;
+      }
+      const homeCoords = parseLatLon(document.getElementById('predHomeCoords').value);
+      if (!homeCoords) {
+        errBox.textContent = 'Введіть координати стартової точки у будь-якому форматі, наприклад: 47.9078, 29.2017';
+        errBox.classList.add('visible'); return;
+      }
+      const homeLat = homeCoords.lat;
+      const homeLon = homeCoords.lon;
+      const windDir = parseFloat(document.getElementById('predWindDir').value || 0);
+      const windSpd = parseFloat(document.getElementById('predWindSpeed').value || 0);
+
+      // ── Pre-compute dead reckoning in browser (integrates full telemetry) ──
+      const dr = computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd);
+
+      // ── Flight summary: last-moment values + post-GPS statistics ──
+      const last = (arr) => arr[arr.length - 1] || 0;
+      const avgArr = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+      // Post-GPS-loss segment indices
+      const postGpsIdx = dr.steps_integrated > 0
+        ? Math.max(0, metrics.t.length - dr.steps_integrated) : 0;
+      const postHdg = metrics.hdg.slice(postGpsIdx);
+      const postSpd = metrics.spd_ms.slice(postGpsIdx);
+      const postZ = metrics.z_ms.slice(postGpsIdx);
+
+      // Circular mean for heading (avoids 359°/1° wrap issue)
+      function circMeanDeg(degs) {
+        if (!degs.length) return 0;
+        const sc = degs.reduce((a, d) => { a.s += Math.sin(d * Math.PI / 180); a.c += Math.cos(d * Math.PI / 180); return a; }, { s: 0, c: 0 });
+        return ((Math.atan2(sc.s / degs.length, sc.c / degs.length) * 180 / Math.PI) + 360) % 360;
+      }
+
+      // Last 10 points
+      const n10 = Math.min(10, metrics.t.length);
+      const avgLast10 = (arr) => arr.slice(-n10).reduce((a, b) => a + b, 0) / n10;
+
+      const flightSummary = {
+        flight_duration_s: Math.round(last(metrics.t)),
+        max_height_m: +Math.max(...metrics.h).toFixed(1),
+        last_height_m: +last(metrics.h).toFixed(1),
+        last_vspeed_ms: +last(metrics.z_ms).toFixed(2),
+        last_hspeed_ms: +avgLast10(metrics.spd_ms).toFixed(2),
+        last_heading_deg: +avgLast10(metrics.hdg).toFixed(1),
+        last_pitch_deg: +last(metrics.pitch).toFixed(1),
+        last_roll_deg: +last(metrics.roll).toFixed(1),
+        // Post-GPS-loss averages (full segment — overall direction of travel)
+        post_gps_avg_hdg_deg: +circMeanDeg(postHdg).toFixed(1),
+        post_gps_avg_spd_ms: +avgArr(postSpd).toFixed(2),
+        post_gps_avg_vspeed_ms: +avgArr(postZ).toFixed(2),
+        post_gps_duration_s: dr.dr_duration_s,
+      };
+
+      document.getElementById('predLoader').classList.add('show');
+      document.getElementById('predBtn').disabled = true;
+      document.getElementById('predResult').classList.remove('show');
+
+      try {
+        const res = await fetch('/predict', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dead_reckoning: dr,
+            flight_summary: flightSummary,
+            home_lat: homeLat,
+            home_lon: homeLon,
+            wind_dir_deg: windDir,
+            wind_speed_ms: windSpd,
+            filename: fileName,
+          })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        // Render result
+        const card = document.getElementById('predCoordsCard');
+        // Physics info block — shows the step-by-step kinematic calculation
+        const physicsInfo = `<div style="font-size:11px;color:var(--text-dim);margin-top:10px;line-height:1.85;
+        background:rgba(0,212,170,.04);border:1px solid rgba(0,212,170,.12);
+        border-radius:8px;padding:10px 12px">
+        <b style="color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
+          📐 Фізична модель розрахунку
+        </b><br>
+        <b>Точка інциденту:</b>
+          ${dr.incident_lat.toFixed(6)}, ${dr.incident_lon.toFixed(6)}
+          &nbsp;·&nbsp; висота: <b style="color:var(--text)">${dr.incident_h_m} м</b><br>
+        <b>Вертикальна швидкість зниження:</b>
+          <b style="color:var(--text)">${dr.descent_rate_ms} м/с</b><br>
+        <b>Час падіння</b> (H / v↓):
+          <b style="color:var(--text)">${dr.incident_h_m} м ÷ ${dr.descent_rate_ms} м/с
+          = <span style="color:var(--accent)">${dr.fall_time_s} с</span></b><br>
+        <b>Знос вітром</b> (${windSpd} м/с × ${dr.fall_time_s} с):
+          <b style="color:var(--accent)">${dr.wind_drift_m} м</b>
+          у напрямку <b style="color:var(--text)">${dr.wind_to_deg}°</b>
+          (вітер з ${windDir}°, азимут зносу ${dr.wind_to_deg}°)
+      </div>`;
+
+        const drInfo = dr.no_gps
+          ? `<div style="font-size:11px;color:var(--warn);margin-top:8px;line-height:1.7">
+          ⚠ <b>Політ без GPS</b> — розрахунок від стартової точки (телеметрія ${dr.dr_duration_s}с, ${dr.dist_own_m}м).
+          Похибка може бути значною.
         </div>`
-      : `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.7">
-          📡 <b style="color:var(--text)">Dead reckoning</b>: від GPS-фіксу на ${dr.last_valid_t}с,
-          тривалість ${dr.dr_duration_s}с — пройдено ${dr.dist_own_m}м (${dr.steps_integrated} кроків)<br>
-          💨 Зсув вітром враховано тільки при падінні (${windSpd} м/с → ${dr.wind_to_deg}°)
+          : `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.7">
+          📡 <b style="color:var(--text)">Активний політ</b>: остання GPS-позиція на ${dr.last_valid_t}с
+          (інтегровано ${dr.dist_own_m}м по телеметрії)
         </div>`;
-    if (data.pred_lat && data.pred_lon) {
-      const latF = data.pred_lat.toFixed(7), lonF = data.pred_lon.toFixed(7);
-      const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
-      const drGmUrl = `https://www.google.com/maps?q=${dr.lat.toFixed(7)},${dr.lon.toFixed(7)}`;
-      card.innerHTML = `
-        <div class="pc-label">🎯 Розрахована точка приземлення (ШІ + dead reckoning)</div>
+
+        if (data.pred_lat && data.pred_lon) {
+          const latF = data.pred_lat.toFixed(7), lonF = data.pred_lon.toFixed(7);
+          const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
+          const drGmUrl = `https://www.google.com/maps?q=${dr.lat.toFixed(7)},${dr.lon.toFixed(7)}`;
+          card.innerHTML = `
+        <div class="pc-label">🎯 Розрахована точка приземлення (ШІ + фізична модель)</div>
         <div class="pc-coords">${latF}, ${lonF}</div>
         <a class="pc-maps" href="${gmUrl}" target="_blank" rel="noopener">Відкрити в Google Maps ↗</a>
         ${drInfo}
-        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">
-          🧭 Тільки dead reckoning (без поправки ШІ):
+        ${physicsInfo}
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px">
+          🧭 Тільки фізична модель (без поправки ШІ):
           <a href="${drGmUrl}" target="_blank" rel="noopener"
              style="color:var(--accent2);text-decoration:none">
             ${dr.lat.toFixed(6)}, ${dr.lon.toFixed(6)} ↗
           </a>
         </div>`;
-    } else {
-      // AI couldn't parse coords — show DR point directly
-      const drGmUrl = `https://www.google.com/maps?q=${dr.lat.toFixed(7)},${dr.lon.toFixed(7)}`;
-      card.innerHTML = `
-        <div class="pc-label">🧭 Dead reckoning (розрахунок без ШІ-уточнення)</div>
+        } else {
+          // AI couldn't parse coords — show physics-model point directly
+          const drGmUrl = `https://www.google.com/maps?q=${dr.lat.toFixed(7)},${dr.lon.toFixed(7)}`;
+          card.innerHTML = `
+        <div class="pc-label">🧭 Фізична модель (без ШІ-уточнення)</div>
         <div class="pc-coords">${dr.lat.toFixed(7)}, ${dr.lon.toFixed(7)}</div>
         <a class="pc-maps" href="${drGmUrl}" target="_blank" rel="noopener">Відкрити в Google Maps ↗</a>
-        ${drInfo}`;
+        ${drInfo}
+        ${physicsInfo}`;
+        }
+
+        // Render markdown-ish explanation
+        const expl = document.getElementById('predExplanation');
+        expl.innerHTML = (data.explanation || '')
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n/g, '<br>');
+
+        document.getElementById('predResult').classList.add('show');
+      } catch (e) {
+        errBox.textContent = 'Помилка: ' + e.message;
+        errBox.classList.add('visible');
+      } finally {
+        document.getElementById('predLoader').classList.remove('show');
+        document.getElementById('predBtn').disabled = false;
+      }
     }
 
-    // Render markdown-ish explanation
-    const expl = document.getElementById('predExplanation');
-    expl.innerHTML = (data.explanation || '')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br>');
+    // ── PWA: Service Worker registration ─────────────────────────────
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/sw.js')
+          .then(reg => console.log('[SW] registered, scope:', reg.scope))
+          .catch(err => console.warn('[SW] registration failed:', err));
+      });
+    }
 
-    document.getElementById('predResult').classList.add('show');
-  } catch(e) {
-    errBox.textContent = 'Помилка: ' + e.message;
-    errBox.classList.add('visible');
-  } finally {
-    document.getElementById('predLoader').classList.remove('show');
-    document.getElementById('predBtn').disabled = false;
-  }
-}
-
-// ── PWA: Service Worker registration ─────────────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/static/sw.js')
-      .then(reg => console.log('[SW] registered, scope:', reg.scope))
-      .catch(err => console.warn('[SW] registration failed:', err));
-  });
-}
-
-// ── PWA: Install prompt ──────────────────────────────────────────
-let _deferredInstall = null;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  _deferredInstall = e;
-  // Show install button if it exists
-  const btn = document.getElementById('installBtn');
-  if (btn) btn.style.display = 'inline-flex';
-});
-window.addEventListener('appinstalled', () => {
-  _deferredInstall = null;
-  const btn = document.getElementById('installBtn');
-  if (btn) btn.style.display = 'none';
-});
-function installApp() {
-  if (!_deferredInstall) return;
-  _deferredInstall.prompt();
-  _deferredInstall.userChoice.then(() => { _deferredInstall = null; });
-}
-</script>
+    // ── PWA: Install prompt ──────────────────────────────────────────
+    let _deferredInstall = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      _deferredInstall = e;
+      // Show install button if it exists
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.style.display = 'inline-flex';
+    });
+    window.addEventListener('appinstalled', () => {
+      _deferredInstall = null;
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.style.display = 'none';
+    });
+    function installApp() {
+      if (!_deferredInstall) return;
+      _deferredInstall.prompt();
+      _deferredInstall.userChoice.then(() => { _deferredInstall = null; });
+    }
+  </script>
 </body>
+
 </html>
