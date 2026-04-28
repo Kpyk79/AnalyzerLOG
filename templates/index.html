@@ -1935,6 +1935,51 @@ function renderPredictionCharts(m) {
   }), CFG);
 }
 
+// ── DEAD RECKONING ────────────────────────────────────────────────
+// Integrates heading × speed × dt from last valid GPS onwards.
+// Returns estimated position at end of telemetry.
+function computeDeadReckoning(m, homeLat, homeLon) {
+  const { t, lat, lon, spd_ms, hdg } = m;
+
+  // Find last valid GPS fix (non-zero, non-spoofed)
+  let lastValidIdx = -1, baseLat = homeLat, baseLon = homeLon;
+  for (let i = 0; i < lat.length; i++) {
+    if (Math.abs(lat[i]) > 0.01 && Math.abs(lon[i]) > 0.01) {
+      lastValidIdx = i;
+      baseLat = lat[i];
+      baseLon = lon[i];
+    }
+  }
+
+  const startIdx = Math.max(0, lastValidIdx);
+  let drLat = baseLat, drLon = baseLon, drDist = 0;
+
+  for (let i = startIdx; i < t.length - 1; i++) {
+    const dt = t[i + 1] - t[i];
+    if (dt <= 0 || dt > 10) continue;          // skip gaps / bad samples
+
+    const hdgRad = ((hdg[i] || 0) * Math.PI) / 180;
+    const spd    = Math.max(0, spd_ms[i] || 0);
+
+    const dNorth = spd * Math.cos(hdgRad) * dt; // metres
+    const dEast  = spd * Math.sin(hdgRad) * dt;
+
+    drLat += dNorth / 111320;
+    drLon += dEast  / (111320 * Math.cos(drLat * Math.PI / 180));
+    drDist += spd * dt;
+  }
+
+  return {
+    lat:               drLat,
+    lon:               drLon,
+    last_valid_lat:    baseLat,
+    last_valid_lon:    baseLon,
+    last_valid_t:      lastValidIdx >= 0 ? Math.round(t[lastValidIdx]) : 0,
+    dist_after_gps_m:  Math.round(drDist),
+    steps_integrated:  t.length - startIdx,
+  };
+}
+
 // ── RUN PREDICTION ────────────────────────────────────────────────
 async function runPrediction() {
   const errBox = document.getElementById('predErrorBox');
@@ -1950,22 +1995,28 @@ async function runPrediction() {
     errBox.textContent = 'Введіть координати стартової точки у будь-якому форматі, наприклад: 47.9078, 29.2017';
     errBox.classList.add('visible'); return;
   }
-  const homeLat  = homeCoords.lat;
-  const homeLon  = homeCoords.lon;
-  const windDir  = parseFloat(document.getElementById('predWindDir').value  || 0);
-  const windSpd  = parseFloat(document.getElementById('predWindSpeed').value || 0);
+  const homeLat = homeCoords.lat;
+  const homeLon = homeCoords.lon;
+  const windDir = parseFloat(document.getElementById('predWindDir').value  || 0);
+  const windSpd = parseFloat(document.getElementById('predWindSpeed').value || 0);
 
-  // Send full telemetry — AI needs complete picture to find last valid GPS and descent profile
-  const lastData = {
-    t:      metrics.t,
-    h:      metrics.h,
-    spd_ms: metrics.spd_ms,
-    z_ms:   metrics.z_ms,
-    hdg:    metrics.hdg,
-    pitch:  metrics.pitch,
-    roll:   metrics.roll,
-    lat:    metrics.lat,
-    lon:    metrics.lon,
+  // ── Pre-compute dead reckoning in browser (integrates full telemetry) ──
+  const dr = computeDeadReckoning(metrics, homeLat, homeLon);
+
+  // ── Summary of last-moment telemetry for fall-physics refinement ──
+  const n    = Math.min(10, metrics.t.length);
+  const avg  = (arr) => arr.slice(-n).reduce((a,b) => a+b, 0) / n;
+  const last = (arr) => arr[arr.length - 1] || 0;
+
+  const flightSummary = {
+    flight_duration_s:  Math.round(last(metrics.t)),
+    last_height_m:      +last(metrics.h).toFixed(1),
+    last_vspeed_ms:     +last(metrics.z_ms).toFixed(2),
+    last_hspeed_ms:     +avg(metrics.spd_ms).toFixed(2),
+    last_heading_deg:   +avg(metrics.hdg).toFixed(1),
+    last_pitch_deg:     +last(metrics.pitch).toFixed(1),
+    last_roll_deg:      +last(metrics.roll).toFixed(1),
+    max_height_m:       +Math.max(...metrics.h).toFixed(1),
   };
 
   document.getElementById('predLoader').classList.add('show');
@@ -1973,27 +2024,52 @@ async function runPrediction() {
   document.getElementById('predResult').classList.remove('show');
 
   try {
-    const res  = await fetch('/predict', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ last_data: lastData, home_lat: homeLat, home_lon: homeLon,
-                             wind_dir_deg: windDir, wind_speed_ms: windSpd, filename: fileName })
+    const res = await fetch('/predict', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dead_reckoning:  dr,
+        flight_summary:  flightSummary,
+        home_lat:        homeLat,
+        home_lon:        homeLon,
+        wind_dir_deg:    windDir,
+        wind_speed_ms:   windSpd,
+        filename:        fileName,
+      })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
     // Render result
     const card = document.getElementById('predCoordsCard');
+    // DR info line
+    const drInfo = `<div style="font-size:11px;color:var(--text-dim);margin-top:8px">
+      📡 Dead reckoning: від GPS-фіксу на ${dr.last_valid_t}с → ${dr.dist_after_gps_m}м пройдено без GPS
+      (${dr.steps_integrated} кроків інтеграції)
+    </div>`;
     if (data.pred_lat && data.pred_lon) {
       const latF = data.pred_lat.toFixed(7), lonF = data.pred_lon.toFixed(7);
       const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
+      const drGmUrl = `https://www.google.com/maps?q=${dr.lat.toFixed(7)},${dr.lon.toFixed(7)}`;
       card.innerHTML = `
-        <div class="pc-label">🎯 Розрахована точка приземлення</div>
+        <div class="pc-label">🎯 Розрахована точка приземлення (ШІ + dead reckoning)</div>
         <div class="pc-coords">${latF}, ${lonF}</div>
-        <a class="pc-maps" href="${gmUrl}" target="_blank" rel="noopener">
-          Відкрити в Google Maps ↗
-        </a>`;
+        <a class="pc-maps" href="${gmUrl}" target="_blank" rel="noopener">Відкрити в Google Maps ↗</a>
+        ${drInfo}
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">
+          🧭 Тільки dead reckoning (без поправки ШІ):
+          <a href="${drGmUrl}" target="_blank" rel="noopener"
+             style="color:var(--accent2);text-decoration:none">
+            ${dr.lat.toFixed(6)}, ${dr.lon.toFixed(6)} ↗
+          </a>
+        </div>`;
     } else {
-      card.innerHTML = `<div class="pc-label">⚠ Координати не вдалося витягти автоматично — дивіться пояснення</div>`;
+      // AI couldn't parse coords — show DR point directly
+      const drGmUrl = `https://www.google.com/maps?q=${dr.lat.toFixed(7)},${dr.lon.toFixed(7)}`;
+      card.innerHTML = `
+        <div class="pc-label">🧭 Dead reckoning (розрахунок без ШІ-уточнення)</div>
+        <div class="pc-coords">${dr.lat.toFixed(7)}, ${dr.lon.toFixed(7)}</div>
+        <a class="pc-maps" href="${drGmUrl}" target="_blank" rel="noopener">Відкрити в Google Maps ↗</a>
+        ${drInfo}`;
     }
 
     // Render markdown-ish explanation
