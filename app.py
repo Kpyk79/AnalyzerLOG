@@ -568,124 +568,172 @@ def build_prompt(summary, filename, mission_type="ВТРАТА",
 ===END_REPORT==="""
 
 
+def _deg_to_compass(deg):
+    """Convert 0–360° azimuth to 8-point compass label (Ukrainian)."""
+    dirs = ["Пн", "Пн-Сх", "Сх", "Пд-Сх", "Пд", "Пд-Зх", "Зх", "Пн-Зх"]
+    return dirs[round(deg / 45) % 8]
+
+
 def build_prediction_prompt(dr, fs, home_lat, home_lon,
                             wind_dir_deg, wind_speed_ms, filename):
     """
     Build AI prompt using pre-computed dead reckoning (dr) and flight summary (fs).
 
-    dr  — dead reckoning dict computed in JS:
-          { lat, lon, last_valid_lat, last_valid_lon, last_valid_t,
-            dist_after_gps_m, steps_integrated }
-    fs  — flight summary dict:
-          { flight_duration_s, last_height_m, last_vspeed_ms, last_hspeed_ms,
-            last_heading_deg, last_pitch_deg, last_roll_deg, max_height_m }
+    Physics model already applied by JS (2-phase):
+      Phase 1 — Active flight:  GPS ground-speed integrated from GPS-loss → peak height.
+                Ground speed is GPS-derived (already includes wind effect).
+      Phase 2 — Free fall:      t_fall = H / v_descent; drift = V_wind × t_fall.
+
+    dr keys:
+      lat, lon                  — final predicted landing point (after wind drift)
+      last_valid_lat/lon        — last valid GPS fix position
+      last_valid_t              — timestamp of last GPS fix
+      no_gps                    — True if entire flight had no GPS
+      dist_own_m                — horizontal distance integrated in Phase 1
+      dr_duration_s             — total duration from GPS loss to end of telemetry
+      incident_lat, incident_lon— position at peak height (Phase 1 end)
+      incident_h_m              — height AGL at the incident point (metres)
+      fall_time_s               — physics-based free-fall duration (H / descent_rate)
+      descent_rate_ms           — descent rate used (measured or 2.2 m/s default)
+      wind_drift_m              — horizontal wind drift during free fall (metres)
+      wind_to_deg               — downwind azimuth (degrees)
     """
-    dr_lat      = dr.get("lat",            home_lat)
-    dr_lon      = dr.get("lon",            home_lon)
-    gps_lat     = dr.get("last_valid_lat", home_lat)
-    gps_lon     = dr.get("last_valid_lon", home_lon)
-    gps_t       = dr.get("last_valid_t",   None)
-    no_gps      = dr.get("no_gps",         False)
-    dr_dist_own = dr.get("dist_own_m",     0)
-    dr_dur_s    = dr.get("dr_duration_s",  0)
+    # ── DR fields ──────────────────────────────────────────────────────────
+    dr_lat         = dr.get("lat",             home_lat)
+    dr_lon         = dr.get("lon",             home_lon)
+    gps_lat        = dr.get("last_valid_lat",  home_lat)
+    gps_lon        = dr.get("last_valid_lon",  home_lon)
+    gps_t          = dr.get("last_valid_t",    None)
+    no_gps         = dr.get("no_gps",          False)
+    dr_dist_own    = dr.get("dist_own_m",      0)
+    dr_dur_s       = dr.get("dr_duration_s",   0)
+    incident_lat   = dr.get("incident_lat",    dr.get("peak_lat",  dr_lat))
+    incident_lon   = dr.get("incident_lon",    dr.get("peak_lon",  dr_lon))
+    incident_h     = dr.get("incident_h_m",   dr.get("peak_h_m",  0))
+    fall_time_s    = dr.get("fall_time_s",     dr.get("fall_duration_s", 0))
+    descent_rate   = dr.get("descent_rate_ms", 2.2)
+    wind_drift_m   = dr.get("wind_drift_m",    0)
+    wind_to        = dr.get("wind_to_deg",     int((wind_dir_deg + 180) % 360))
 
-    last_h      = fs.get("last_height_m",  0)
-    last_z      = fs.get("last_vspeed_ms", 0)
-    last_spd    = fs.get("last_hspeed_ms", 0)
+    # ── Flight summary fields ──────────────────────────────────────────────
+    last_h      = fs.get("last_height_m",    0)
+    last_z      = fs.get("last_vspeed_ms",   0)
+    last_spd    = fs.get("last_hspeed_ms",   0)
     last_hdg    = fs.get("last_heading_deg", 0)
-    last_pitch  = fs.get("last_pitch_deg", 0)
-    last_roll   = fs.get("last_roll_deg",  0)
+    last_pitch  = fs.get("last_pitch_deg",   0)
+    last_roll   = fs.get("last_roll_deg",    0)
     flight_s    = fs.get("flight_duration_s", 0)
-
-    wind_to = (wind_dir_deg + 180) % 360
+    max_h       = fs.get("max_height_m",     last_h)
 
     post_avg_hdg = fs.get("post_gps_avg_hdg_deg",   last_hdg)
     post_avg_spd = fs.get("post_gps_avg_spd_ms",    last_spd)
     post_avg_z   = fs.get("post_gps_avg_vspeed_ms", last_z)
     post_dur     = fs.get("post_gps_duration_s",    dr_dur_s)
-    max_h        = fs.get("max_height_m",            last_h)
 
+    # ── GPS context block ──────────────────────────────────────────────────
     if no_gps:
-        gps_context = (
-            f"GPS-координати протягом ВСЬОГО польоту були відсутні.\n"
-            f"Стартова точка вказана вручну оператором: {home_lat:.7f}, {home_lon:.7f}\n"
-            f"Dead reckoning виконано з першої секунди по всій телеметрії ({flight_s}с, {dr_dist_own}м).\n"
-            f"Похибка DR значно вища через відсутність жодної GPS-прив'язки — враховуй це."
+        gps_block = (
+            f"⚠ ПОЛІТ БЕЗ GPS — весь маршрут без позиціонування.\n"
+            f"  Стартова точка вказана оператором вручну: {home_lat:.7f}, {home_lon:.7f}\n"
+            f"  Dead reckoning охоплює весь політ ({flight_s}с). "
+            f"Накопичена похибка може бути суттєвою."
         )
-        dr_context = (
-            f"DEAD RECKONING БЕЗ GPS (весь політ, {dr_dur_s}с, {dr_dist_own}м від стартової точки):\n"
-            f"→ Розрахована позиція: {dr_lat:.7f}, {dr_lon:.7f}\n"
-            f"  УВАГА: це суто розрахункова позиція без жодної GPS-прив'язки.\n"
-            f"  Похибка може бути суттєвою (сотні метрів), особливо при тривалому польоті."
+        phase1_block = (
+            f"ФАЗА 1 — Активний політ (без GPS, {dr_dur_s}с):\n"
+            f"  Інтегровано весь маршрут від стартової точки → пікова висота.\n"
+            f"  Середній курс: {post_avg_hdg:.1f}°, середня швидкість: {post_avg_spd:.2f} м/с\n"
+            f"  Розрахована позиція інциденту: {incident_lat:.7f}, {incident_lon:.7f} "
+            f"(висота ~{incident_h}м)"
         )
-        stat_label = f"СТАТИСТИКА ПОЛЬОТУ (весь маршрут, {post_dur}с без GPS)"
     else:
-        gps_context = (
-            f"Остання валідна GPS: {gps_lat:.7f}, {gps_lon:.7f} (t={gps_t}с)\n"
-            f"Після цього GPS було втрачено і дрон летів без позиціонування."
+        gps_block = (
+            f"Остання валідна GPS: {gps_lat:.7f}, {gps_lon:.7f}  (t={gps_t}с)\n"
+            f"  Після цього GPS-сигнал відсутній — дрон летів без позиціонування."
         )
-        dr_context = (
-            f"DEAD RECKONING після втрати GPS ({dr_dur_s}с, {dr_dist_own}м):\n"
-            f"→ Розрахована позиція кінця запису: {dr_lat:.7f}, {dr_lon:.7f}\n"
-            f"  Це де дрон знаходився в КІНЦІ телеметрії (ще на висоті {last_h}м, не на землі).\n"
-            f"  DR має накопичену похибку — враховуй це при оцінці."
+        phase1_block = (
+            f"ФАЗА 1 — Активний політ після GPS-втрати ({post_dur}с):\n"
+            f"  Інтегровано телеметрію від GPS-фіксу → пікова висота ({dr_dist_own}м).\n"
+            f"  Середній курс: {post_avg_hdg:.1f}°, середня швидкість: {post_avg_spd:.2f} м/с\n"
+            f"  ★ Наземна швидкість — GPS-похідна, вітер вже закладено у вектор руху.\n"
+            f"    Якщо вітер > швидкість дрона, апарат фактично відкидало назад.\n"
+            f"  Позиція інциденту (пік): {incident_lat:.7f}, {incident_lon:.7f} "
+            f"(висота {incident_h}м)"
         )
-        stat_label = f"СТАТИСТИКА ПІСЛЯ ВТРАТИ GPS ({post_dur}с)"
 
-    return f"""Ти — досвідчений фахівець пошуково-рятувальних операцій з БпЛА. Тобі потрібно визначити найімовірніше місце приземлення (падіння) дрона.
+    phase2_block = (
+        f"ФАЗА 2 — Некерований спуск (фізична модель):\n"
+        f"  Час падіння: {incident_h}м ÷ {descent_rate:.1f}м/с = {fall_time_s:.1f}с\n"
+        f"  Зміщення вітром: {wind_speed_ms}м/с × {fall_time_s:.1f}с = {wind_drift_m}м "
+        f"в напрямку {wind_to}° ({_deg_to_compass(wind_to)})\n"
+        f"  ★ Розрахована точка приземлення: {dr_lat:.7f}, {dr_lon:.7f}"
+    )
 
-ДАНІ ПОЛЬОТУ ({filename}):
-• Старт: {home_lat:.7f}, {home_lon:.7f}
-• {gps_context}
-• Тривалість польоту: {flight_s}с, макс. висота: {max_h}м
+    return f"""Ти — досвідчений фахівець пошуково-рятувальних операцій з БпЛА.
+Твоє завдання — ПЕРЕВІРИТИ фізичну модель, яку вже виконав алгоритм, і за потреби скоригувати результат.
 
-{dr_context}
+════════════════════════════════════════════════════════
+ДАНІ ПОЛЬОТУ  [{filename}]
+════════════════════════════════════════════════════════
+Стартова точка: {home_lat:.7f}, {home_lon:.7f}
+{gps_block}
+Тривалість: {flight_s}с | Макс. висота: {max_h}м
 
-{stat_label}:
-• Середній курс: {post_avg_hdg:.1f}° (загальний напрямок руху)
-• Середня горизонтальна швидкість: {post_avg_spd:.2f} м/с
-• Середня вертикальна швидкість: {post_avg_z:.2f} м/с
+ВІТЕР: {wind_speed_ms} м/с З напрямку {wind_dir_deg}° → дме В напрямку {wind_to}° ({_deg_to_compass(wind_to)})
 
-ОСТАННІ СЕКУНДИ ПОЛЬОТУ:
-• Висота: {last_h}м, вертикальна: {last_z:.2f}м/с, горизонтальна: {last_spd:.2f}м/с
-• Курс: {last_hdg:.1f}°, Pitch: {last_pitch:.1f}°, Roll: {last_roll:.1f}°
+════════════════════════════════════════════════════════
+РОЗРАХУНОК АЛГОРИТМУ (2-фазна модель)
+════════════════════════════════════════════════════════
+{phase1_block}
 
-ВІТЕР: {wind_speed_ms}м/с з {wind_dir_deg}° (дме в напрямку {wind_to}°)
+{phase2_block}
 
-Проаналізуй ситуацію цілісно. Не обмежуйся лише формулами — думай як пошуковик:
-- Чи виглядає DR-позиція логічно з огляду на загальний курс та швидкість?
-- Яка фаза польоту в момент втрати сигналу (керований спуск / ATTI-дрейф / падіння)?
-- Як реально поводиться дрон цього типу при втраті керування на такій висоті?
-- Де найімовірніше він міг приземлитися з урахуванням всіх факторів?
-- {"Похибка DR охоплює весь маршрут — враховуй більший радіус невизначеності." if no_gps else "Вітер враховуй тільки для некерованої фази (після кінця телеметрії)."}
+ОСТАННІ СЕКУНДИ ТЕЛЕМЕТРІЇ:
+  Висота: {last_h}м | V_верт: {last_z:.2f}м/с | V_гор: {last_spd:.2f}м/с
+  Курс: {last_hdg:.1f}° | Pitch: {last_pitch:.1f}° | Roll: {last_roll:.1f}°
 
-Дай відповідь у такому форматі:
+════════════════════════════════════════════════════════
+ТВОЄ ЗАВДАННЯ
+════════════════════════════════════════════════════════
+1. ПЕРЕВІР Фазу 1:
+   — Чи правдоподібна позиція інциденту ({incident_lat:.5f}, {incident_lon:.5f})?
+   — Чи відповідає курс {post_avg_hdg:.1f}° і швидкість {post_avg_spd:.2f}м/с реальній ситуації?
+   — КЛЮЧОВИЙ ПРИНЦИП «бігова доріжка»: якщо вітер ({wind_speed_ms}м/с) > швидкість дрона
+     ({post_avg_spd:.2f}м/с) і вітер ПРОТИ курсу дрона, то GPS-швидкість покаже від'ємний
+     рух у напрямку дрона — тобто дрон фактично летить НАЗАД. Перевір чи це відповідає
+     напрямку вітру ({wind_dir_deg}°) та курсу дрона ({post_avg_hdg:.1f}°).
+
+2. ПЕРЕВІР Фазу 2:
+   — Чи реалістичний час падіння {fall_time_s:.1f}с для висоти {incident_h}м?
+   — Чи вірно визначено напрямок зносу вітром?
+   — Зміщення {wind_drift_m}м в напрямку {wind_to}° — чи відповідає це реальній обстановці?
+
+3. СКОРИГУЙ якщо потрібно і дай ОСТАТОЧНІ координати приземлення.
+   {"⚠ Польот без GPS — враховуй суттєво більший радіус невизначеності (300–500м)." if no_gps else ""}
+
+Відповідай у такому форматі:
 
 ===COORDS===
-[найімовірніша_широта],[найімовірніша_довгота]
+[остаточна_широта],[остаточна_довгота]
 ===END_COORDS===
 
 ===EXPLANATION===
-**Аналіз траєкторії та режиму:**
-[Оціни DR-позицію. Чи відповідає вона середньому курсу {post_avg_hdg:.0f}° і пройденій відстані {dr_dist_own}м? Що відбувалося з дроном після втрати GPS — він летів, дрейфував чи падав?]
+**Перевірка Фази 1 (активний політ):**
+[Аналіз позиції інциденту. Перевірка принципу «бігова доріжка» — вітер vs швидкість дрона.]
 
-**Фаза приземлення:**
-[Що кажуть висота={last_h}м, v_z={last_z:.2f}м/с, pitch/roll? Скільки приблизно часу до удару? Скільки він міг ще пролетіти горизонтально?]
+**Перевірка Фази 2 (некерований спуск):**
+[Час падіння, зміщення вітром, напрямок. Чи потрібна корекція?]
 
-**Вплив вітру ({wind_speed_ms}м/с → {wind_to}°):**
-[Зміщення за час некерованої фази. Наскільки суттєво це міняє позицію?]
-
-**Найімовірніша точка приземлення:**
-{dr_lat:.7f}, {dr_lon:.7f} (DR-база) + корекції =
-Широта: [значення]
-Довгота: [значення]
+**Остаточна точка приземлення:**
+Алгоритм: {dr_lat:.7f}, {dr_lon:.7f}
+Скоригована: [широта], [довгота]
+Відхилення від алгоритму: [X]м в напрямку [Y]°
 
 **Зона пошуку:**
-Центр: [координати], радіус: [X]м
-[Чому саме такий радіус — звідки береться невизначеність?]
+Центр: [координати] | Радіус: [X]м
+[Обґрунтування радіусу]
 
-**Де шукати в першу чергу:**
-[Конкретні рекомендації — напрямок від стартової точки, орієнтири, пріоритетні квадрати]
+**Пріоритет пошуку:**
+[Азимут від старту, відстань, конкретний опис місця]
 ===END_EXPLANATION==="""
 
 
