@@ -378,6 +378,13 @@
     color: var(--accent);
     word-break: break-all;
   }
+  .coord-card .coord-time {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 4px;
+    line-height: 1.2;
+  }
   .coord-card a.map-link {
     display: inline-block;
     margin-top: 6px;
@@ -1149,20 +1156,28 @@ function renderStats(s) {
 function renderCoords(s) {
   const block = document.getElementById('coordBlock');
   const validCoord = (lat, lon) => lat && lon && !(lat === 0 && lon === 0);
+  const takeoffTime = secToLocalStr(s.start_dt, 0);
+  const landingTime = secToLocalStr(s.start_dt, s.duration_s);
 
-  function coordCard(id, title, lat, lon) {
+  function coordCard(id, title, lat, lon, timeStr) {
     const el = document.getElementById(id);
-    if (!validCoord(lat, lon)) { el.innerHTML = `<div class="coord-title">${title}</div><div style="color:var(--text-dim);font-size:12px">Координати недоступні</div>`; return; }
+    const timeHtml = timeStr && timeStr !== '—'
+      ? `<div class="coord-time">${timeStr} UTC+2</div>` : '';
+    if (!validCoord(lat, lon)) {
+      el.innerHTML = `<div class="coord-title">${title}</div>${timeHtml}<div style="color:var(--text-dim);font-size:12px">Координати недоступні</div>`;
+      return;
+    }
     const latF = lat.toFixed(7), lonF = lon.toFixed(7);
     const gmUrl = `https://www.google.com/maps?q=${latF},${lonF}`;
     el.innerHTML = `
       <div class="coord-title">${title}</div>
+      ${timeHtml}
       <div class="coord-val">${latF}, ${lonF}</div>
       <a class="map-link" href="${gmUrl}" target="_blank" rel="noopener">Відкрити в Google Maps ↗</a>`;
   }
 
-  coordCard('coordHome',  'Домашня точка (зліт)', s.home_lat,  s.home_lon);
-  coordCard('coordFinal', 'Фінальна точка (посадка)', s.final_lat, s.final_lon);
+  coordCard('coordHome',  'Домашня точка (зліт)',     s.home_lat,  s.home_lon,  takeoffTime);
+  coordCard('coordFinal', 'Фінальна точка (посадка)', s.final_lat, s.final_lon, landingTime);
   block.style.display = 'block';
 }
 
