@@ -568,6 +568,156 @@ def build_prompt(summary, filename, mission_type="ВТРАТА",
 ===END_REPORT==="""
 
 
+def build_prediction_prompt(last_data, home_lat, home_lon,
+                            wind_dir_deg, wind_speed_ms, filename):
+    """Build an AI prompt for estimating UAV crash/landing coordinates."""
+    t    = last_data.get("t",       [])
+    h    = last_data.get("h",       [])
+    spd  = last_data.get("spd_ms",  [])
+    z    = last_data.get("z_ms",    [])
+    hdg  = last_data.get("hdg",     [])
+    ptch = last_data.get("pitch",   [])
+    rl   = last_data.get("roll",    [])
+    lat  = last_data.get("lat",     [])
+    lon  = last_data.get("lon",     [])
+
+    # Find last valid GPS fix (non-zero)
+    last_gps_lat, last_gps_lon, last_gps_t = home_lat, home_lon, 0.0
+    for la, lo, ts in zip(lat, lon, t):
+        if abs(la) > 0.01 and abs(lo) > 0.01:
+            last_gps_lat, last_gps_lon, last_gps_t = la, lo, ts
+
+    # Recent averages (last 10 pts)
+    n = min(10, len(t))
+    def avg(arr): return round(sum(arr[-n:]) / n, 2) if arr else 0
+
+    last_h    = round(h[-1],    1) if h    else 0
+    last_spd  = round(spd[-1],  2) if spd  else 0
+    last_z    = round(z[-1],    2) if z    else 0
+    last_hdg  = round(hdg[-1],  1) if hdg  else 0
+    last_ptch = round(ptch[-1], 1) if ptch else 0
+    last_rl   = round(rl[-1],   1) if rl   else 0
+    flight_s  = round(t[-1],    1) if t    else 0
+
+    wind_to = (wind_dir_deg + 180) % 360   # direction wind is blowing TO
+
+    return f"""Ти — фахівець з пошуково-рятувальних операцій та фізики польоту БпЛА (безпілотних літальних апаратів).
+
+Завдання: розрахуй приблизну точку приземлення (падіння) БпЛА на основі останніх даних телеметрії та погодних умов. Проведи покрокові фізичні розрахунки, наведи формули та числові значення на кожному кроці.
+
+ВХІДНІ ДАНІ:
+Файл: {filename}
+Домашня точка (зліт): {home_lat:.7f}, {home_lon:.7f}
+Остання GPS-фіксація: {last_gps_lat:.7f}, {last_gps_lon:.7f} (на {round(last_gps_t, 1)} с польоту)
+Загальна тривалість запису: {flight_s} с
+
+ОСТАННІ ПОКАЗНИКИ ТЕЛЕМЕТРІЇ (момент втрати сигналу):
+- Висота над точкою зльоту: {last_h} м
+- Горизонтальна швидкість: {last_spd} м/с
+- Вертикальна швидкість: {last_z} м/с (від'ємне = падіння вниз)
+- Курс компаса: {last_hdg}°
+- Кут Pitch: {last_ptch}°, Roll: {last_rl}°
+
+Середні за останні ~10 секунд запису:
+- Ср. горизонтальна швидкість: {avg(spd)} м/с
+- Ср. вертикальна швидкість:   {avg(z)} м/с
+- Ср. курс: {avg(hdg)}°
+
+ПОГОДНІ УМОВИ:
+- Вітер дме ЗА напрямом: {wind_dir_deg}° (тобто вітер дме В сторону {wind_to}°)
+- Швидкість вітру: {wind_speed_ms} м/с
+
+МЕТОДИКА РОЗРАХУНКУ:
+1. Визнач режим падіння (вільне падіння, планування, керований спуск).
+2. Розрахуй час падіння T = ∫(h/|v_z|) з урахуванням початкової вертикальної швидкості та прискорення g=9.81 м/с².
+3. Розрахуй зміщення від власного горизонтального вектору: Δd_own = v_h × T у напрямі курсу {last_hdg}°.
+4. Розрахуй зміщення від вітру: Δd_wind = v_wind × T у напрямі {wind_to}°.
+5. Перетвори зміщення в градуси lat/lon (1° lat ≈ 111 320 м; 1° lon ≈ 111 320 × cos(lat) м).
+6. Обчисли фінальні координати = остання GPS-точка + Δd_own + Δd_wind.
+7. Оціни радіус невизначеності (враховуй похибки: невідомий час від втрати GPS до падіння, зміна вертикальної швидкості, атмосферна турбулентність).
+
+Відповідай ВИКЛЮЧНО українською мовою у ТОЧНО такому форматі:
+
+===COORDS===
+[розрахована_широта],[розрахована_довгота]
+===END_COORDS===
+
+===EXPLANATION===
+**Режим падіння:**
+[опис — вільне падіння / планування / керований спуск з обґрунтуванням]
+
+**Крок 1 — Час падіння:**
+[формула + підстановка числових значень + результат T = X с]
+
+**Крок 2 — Зміщення від власного руху БпЛА:**
+[формула + значення + напрям {last_hdg}° + результат у метрах і Δlat, Δlon]
+
+**Крок 3 — Зміщення від вітру:**
+[формула + значення + напрям {wind_to}° + результат у метрах і Δlat, Δlon]
+
+**Крок 4 — Розрахована точка приземлення:**
+Широта: [значення]
+Довгота: [значення]
+Google Maps: https://www.google.com/maps?q=[широта],[довгота]
+
+**Радіус пошуку:** [X] м (обґрунтування)
+
+**Пріоритетні зони пошуку:**
+[практичні рекомендації — рельєф, рослинність, водойми, будівлі у напрямку падіння; де насамперед шукати]
+
+**Зона пошуку — сектор:**
+[опис сектора: від якої точки, в якому напрямку, на якій відстані]
+===END_EXPLANATION==="""
+
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    """AI-assisted UAV landing point prediction."""
+    try:
+        data = request.get_json(force=True)
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            return jsonify({"error": "ANTHROPIC_API_KEY не знайдено у .env"}), 400
+
+        last_data     = data.get("last_data",      {})
+        home_lat      = float(data.get("home_lat",      0))
+        home_lon      = float(data.get("home_lon",      0))
+        wind_dir_deg  = float(data.get("wind_dir_deg",  0))
+        wind_speed_ms = float(data.get("wind_speed_ms", 0))
+        filename      = data.get("filename", "unknown.csv")
+
+        prompt = build_prediction_prompt(
+            last_data, home_lat, home_lon,
+            wind_dir_deg, wind_speed_ms, filename
+        )
+
+        import anthropic as ant
+        client = ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-opus-4-7",
+            max_tokens=3000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text
+
+        pred_lat, pred_lon = None, None
+        m = re.search(r'===COORDS===\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*===END_COORDS===',
+                      raw, re.DOTALL)
+        if m:
+            pred_lat = float(m.group(1))
+            pred_lon = float(m.group(2))
+
+        explanation = raw
+        if "===EXPLANATION===" in raw and "===END_EXPLANATION===" in raw:
+            explanation = (raw.split("===EXPLANATION===")[1]
+                              .split("===END_EXPLANATION===")[0].strip())
+
+        return jsonify({"pred_lat": pred_lat, "pred_lon": pred_lon,
+                        "explanation": explanation})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
