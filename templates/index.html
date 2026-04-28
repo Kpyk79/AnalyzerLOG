@@ -1398,6 +1398,10 @@
                 <label>Швидкість вітру, м/с</label>
                 <input type="number" id="predWindSpeed" min="0" max="50" step="0.1" placeholder="напр. 5">
               </div>
+              <div class="pred-field">
+                <label>Висота, м</label>
+                <input type="number" id="predHeight" min="0" max="1000" step="0.1" placeholder="напр. 85">
+              </div>
               <div class="pred-field" style="grid-column:1/-1">
                 <label>Використати дані з аналізу</label>
                 <button class="btn btn-secondary" style="width:fit-content;font-size:12px"
@@ -2529,7 +2533,7 @@
     //                           the operator-supplied coords as anchor.
     // forceManualHome = false → find last valid GPS fix in log; start from there.
     function computeDeadReckoning(m, homeLat, homeLon, windDirDeg, windSpeedMs,
-                                  forceManualHome = false) {
+                                  forceManualHome = false, explicitHeight = null) {
       const { t, lat, lon, spd_ms, hdg } = m;
       const h    = m.h   || m.alt || m.height || [];
       const z_ms = m.z_ms || [];
@@ -2581,7 +2585,7 @@
       const incidentLon = drLon;
       const lastIdx     = Math.max(0, t.length - 1);
       // Height at last telemetry point (AGL, metres)
-      const incidentH   = Math.max(0, h.length > lastIdx ? (h[lastIdx] || 0) : 0);
+      const incidentH   = explicitHeight !== null ? explicitHeight : Math.max(0, h.length > lastIdx ? (h[lastIdx] || 0) : 0);
 
       // ════════════════════════════════════════════════════════════════
       // STEP 3 — Phase 2: remaining free fall from last known height
@@ -2660,11 +2664,13 @@
       const homeLon = homeCoords.lon;
       const windDir = parseFloat(document.getElementById('predWindDir').value || 0);
       const windSpd = parseFloat(document.getElementById('predWindSpeed').value || 0);
+      const heightInput = document.getElementById('predHeight').value;
+      const explicitHeight = heightInput !== '' ? parseFloat(heightInput) : null;
 
       // ── Pre-compute dead reckoning in browser (integrates full telemetry) ──
       // forceManualHome=true: user explicitly entered home coords → ignore log GPS,
       // integrate from t=0 with the operator-supplied position as anchor.
-      const dr = computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd, true);
+      const dr = computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd, true, explicitHeight);
       _lastKmlDr = dr;   // cache for KML export
 
       // ── Flight summary: last-moment values + post-GPS statistics ──
@@ -2834,13 +2840,15 @@
 
       const windDir = parseFloat(document.getElementById('predWindDir').value  || 0);
       const windSpd = parseFloat(document.getElementById('predWindSpeed').value || 0);
+      const heightInput = document.getElementById('predHeight') ? document.getElementById('predHeight').value : '';
+      const explicitHeight = heightInput !== '' ? parseFloat(heightInput) : null;
 
       // Use cached DR if available, otherwise compute fresh.
       // Always forceManualHome=true — KML export uses the same anchor logic
       // as runPrediction (operator coords override log GPS).
       const dr = _lastKmlDr ||
         (homeLat !== null
-          ? computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd, true)
+          ? computeDeadReckoning(metrics, homeLat, homeLon, windDir, windSpd, true, explicitHeight)
           : null);
 
       const kml = buildFlightKML(metrics, dr, _lastKmlPred, homeLat, homeLon, fileName);
