@@ -568,105 +568,102 @@ def build_prompt(summary, filename, mission_type="ВТРАТА",
 ===END_REPORT==="""
 
 
-def build_prediction_prompt(last_data, home_lat, home_lon,
+def build_prediction_prompt(dr, fs, home_lat, home_lon,
                             wind_dir_deg, wind_speed_ms, filename):
-    """Build an AI prompt for estimating UAV crash/landing coordinates."""
-    t    = last_data.get("t",       [])
-    h    = last_data.get("h",       [])
-    spd  = last_data.get("spd_ms",  [])
-    z    = last_data.get("z_ms",    [])
-    hdg  = last_data.get("hdg",     [])
-    ptch = last_data.get("pitch",   [])
-    rl   = last_data.get("roll",    [])
-    lat  = last_data.get("lat",     [])
-    lon  = last_data.get("lon",     [])
+    """
+    Build AI prompt using pre-computed dead reckoning (dr) and flight summary (fs).
 
-    # Find last valid GPS fix (non-zero)
-    last_gps_lat, last_gps_lon, last_gps_t = home_lat, home_lon, 0.0
-    for la, lo, ts in zip(lat, lon, t):
-        if abs(la) > 0.01 and abs(lo) > 0.01:
-            last_gps_lat, last_gps_lon, last_gps_t = la, lo, ts
+    dr  — dead reckoning dict computed in JS:
+          { lat, lon, last_valid_lat, last_valid_lon, last_valid_t,
+            dist_after_gps_m, steps_integrated }
+    fs  — flight summary dict:
+          { flight_duration_s, last_height_m, last_vspeed_ms, last_hspeed_ms,
+            last_heading_deg, last_pitch_deg, last_roll_deg, max_height_m }
+    """
+    dr_lat      = dr.get("lat",            home_lat)
+    dr_lon      = dr.get("lon",            home_lon)
+    gps_lat     = dr.get("last_valid_lat", home_lat)
+    gps_lon     = dr.get("last_valid_lon", home_lon)
+    gps_t       = dr.get("last_valid_t",   0)
+    dr_dist     = dr.get("dist_after_gps_m", 0)
 
-    # Recent averages (last 10 pts)
-    n = min(10, len(t))
-    def avg(arr): return round(sum(arr[-n:]) / n, 2) if arr else 0
+    last_h      = fs.get("last_height_m",  0)
+    last_z      = fs.get("last_vspeed_ms", 0)
+    last_spd    = fs.get("last_hspeed_ms", 0)
+    last_hdg    = fs.get("last_heading_deg", 0)
+    last_pitch  = fs.get("last_pitch_deg", 0)
+    last_roll   = fs.get("last_roll_deg",  0)
+    flight_s    = fs.get("flight_duration_s", 0)
 
-    last_h    = round(h[-1],    1) if h    else 0
-    last_spd  = round(spd[-1],  2) if spd  else 0
-    last_z    = round(z[-1],    2) if z    else 0
-    last_hdg  = round(hdg[-1],  1) if hdg  else 0
-    last_ptch = round(ptch[-1], 1) if ptch else 0
-    last_rl   = round(rl[-1],   1) if rl   else 0
-    flight_s  = round(t[-1],    1) if t    else 0
+    wind_to = (wind_dir_deg + 180) % 360
 
-    wind_to = (wind_dir_deg + 180) % 360   # direction wind is blowing TO
+    return f"""Ти — фахівець з пошуково-рятувальних операцій та фізики польоту БпЛА.
 
-    return f"""Ти — фахівець з пошуково-рятувальних операцій та фізики польоту БпЛА (безпілотних літальних апаратів).
+КОНТЕКСТ ЗАДАЧІ:
+Браузер вже виконав dead reckoning — інтеграцію курсу × швидкість × dt по всій телеметрії після останнього валідного GPS-фіксу. Це найточніший доступний розрахунок позиції дрона. Твоє завдання — використати цю позицію як базову і уточнити лише кінцеве зміщення при падінні.
 
-Завдання: розрахуй приблизну точку приземлення (падіння) БпЛА на основі останніх даних телеметрії та погодних умов. Проведи покрокові фізичні розрахунки, наведи формули та числові значення на кожному кроці.
-
-ВХІДНІ ДАНІ:
-Файл: {filename}
+ФАЙЛ: {filename}
 Домашня точка (зліт): {home_lat:.7f}, {home_lon:.7f}
-Остання GPS-фіксація: {last_gps_lat:.7f}, {last_gps_lon:.7f} (на {round(last_gps_t, 1)} с польоту)
-Загальна тривалість запису: {flight_s} с
+Остання валідна GPS: {gps_lat:.7f}, {gps_lon:.7f} (на {gps_t} с польоту)
 
-ОСТАННІ ПОКАЗНИКИ ТЕЛЕМЕТРІЇ (момент втрати сигналу):
+РЕЗУЛЬТАТ DEAD RECKONING (інтеграція {dr_dist} м без GPS, розрахована браузером):
+→ Позиція після DR: {dr_lat:.7f}, {dr_lon:.7f}
+Це позиція дрона в кінці телеметрії (не місце приземлення — дрон ще міг бути на висоті).
+
+СТАН ДРОНА В КІНЦІ ЗАПИСУ ТЕЛЕМЕТРІЇ:
 - Висота над точкою зльоту: {last_h} м
 - Горизонтальна швидкість: {last_spd} м/с
-- Вертикальна швидкість: {last_z} м/с (від'ємне = падіння вниз)
-- Курс компаса: {last_hdg}°
-- Кут Pitch: {last_ptch}°, Roll: {last_rl}°
-
-Середні за останні ~10 секунд запису:
-- Ср. горизонтальна швидкість: {avg(spd)} м/с
-- Ср. вертикальна швидкість:   {avg(z)} м/с
-- Ср. курс: {avg(hdg)}°
+- Вертикальна швидкість: {last_z} м/с (від'ємна = падіння)
+- Курс: {last_hdg}°
+- Pitch: {last_pitch}°, Roll: {last_roll}°
+- Тривалість польоту: {flight_s} с
 
 ПОГОДНІ УМОВИ:
-- Вітер дме ЗА напрямом: {wind_dir_deg}° (тобто вітер дме В сторону {wind_to}°)
+- Вітер дме З напряму: {wind_dir_deg}° → В напрям: {wind_to}°
 - Швидкість вітру: {wind_speed_ms} м/с
 
-МЕТОДИКА РОЗРАХУНКУ:
-1. Визнач режим падіння (вільне падіння, планування, керований спуск).
-2. Розрахуй час падіння T = ∫(h/|v_z|) з урахуванням початкової вертикальної швидкості та прискорення g=9.81 м/с².
-3. Розрахуй зміщення від власного горизонтального вектору: Δd_own = v_h × T у напрямі курсу {last_hdg}°.
-4. Розрахуй зміщення від вітру: Δd_wind = v_wind × T у напрямі {wind_to}°.
-5. Перетвори зміщення в градуси lat/lon (1° lat ≈ 111 320 м; 1° lon ≈ 111 320 × cos(lat) м).
-6. Обчисли фінальні координати = остання GPS-точка + Δd_own + Δd_wind.
-7. Оціни радіус невизначеності (враховуй похибки: невідомий час від втрати GPS до падіння, зміна вертикальної швидкості, атмосферна турбулентність).
+ТВОЄ ЗАВДАННЯ (тільки уточнення кінцевого падіння):
+1. Визнач режим падіння (вільне падіння / планування / керований спуск) за pitch/roll/vspeed.
+2. Розрахуй час падіння T з висоти {last_h} м.
+   - Якщо v_z < 0: T ≈ (v_z + √(v_z² + 2·g·h)) / g
+   - Якщо v_z ≈ 0: T ≈ √(2·h/g)
+3. Додаткове горизонтальне зміщення за час падіння:
+   - Від власної швидкості: Δd_own = {last_spd} × T у напрямі {last_hdg}°
+   - Від вітру: Δd_wind = {wind_speed_ms} × T у напрямі {wind_to}°
+4. Фінальна точка = DR-позиція ({dr_lat:.6f}, {dr_lon:.6f}) + Δ_own + Δ_wind
+5. Радіус невизначеності (враховуй: накопичена похибка DR, зміна швидкості після втрати GPS).
 
+ВАЖЛИВО: базова точка — DR ({dr_lat:.6f}, {dr_lon:.6f}), а НЕ домашня точка і НЕ остання GPS.
 Відповідай ВИКЛЮЧНО українською мовою у ТОЧНО такому форматі:
 
 ===COORDS===
-[розрахована_широта],[розрахована_довгота]
+[фінальна_широта],[фінальна_довгота]
 ===END_COORDS===
 
 ===EXPLANATION===
 **Режим падіння:**
-[опис — вільне падіння / планування / керований спуск з обґрунтуванням]
+[вільне падіння / планування / керований спуск — обґрунтування за pitch={last_pitch}°, roll={last_roll}°, vspeed={last_z} м/с]
 
-**Крок 1 — Час падіння:**
-[формула + підстановка числових значень + результат T = X с]
+**Крок 1 — Час падіння з {last_h} м:**
+[формула + числова підстановка → T = X с]
 
-**Крок 2 — Зміщення від власного руху БпЛА:**
-[формула + значення + напрям {last_hdg}° + результат у метрах і Δlat, Δlon]
+**Крок 2 — Зміщення від власного руху за час T:**
+[Δd = {last_spd} × T = X м у напрямі {last_hdg}° → Δlat = …, Δlon = …]
 
-**Крок 3 — Зміщення від вітру:**
-[формула + значення + напрям {wind_to}° + результат у метрах і Δlat, Δlon]
+**Крок 3 — Зміщення від вітру за час T:**
+[Δd = {wind_speed_ms} × T = X м у напрямі {wind_to}° → Δlat = …, Δlon = …]
 
-**Крок 4 — Розрахована точка приземлення:**
+**Крок 4 — Фінальна точка приземлення:**
+Базова DR-позиція: {dr_lat:.7f}, {dr_lon:.7f}
++ Δ крок 2 + Δ крок 3 =
 Широта: [значення]
 Довгота: [значення]
-Google Maps: https://www.google.com/maps?q=[широта],[довгота]
 
-**Радіус пошуку:** [X] м (обґрунтування)
+**Радіус пошуку:** [X] м
+[обґрунтування: похибка DR ({dr_dist} м без GPS) + невизначеність при падінні]
 
 **Пріоритетні зони пошуку:**
-[практичні рекомендації — рельєф, рослинність, водойми, будівлі у напрямку падіння; де насамперед шукати]
-
-**Зона пошуку — сектор:**
-[опис сектора: від якої точки, в якому напрямку, на якій відстані]
+[практичні рекомендації — де саме шукати, пріоритетний напрямок від базової DR-точки]
 ===END_EXPLANATION==="""
 
 
@@ -679,15 +676,16 @@ def predict():
         if not api_key:
             return jsonify({"error": "ANTHROPIC_API_KEY не знайдено у .env"}), 400
 
-        last_data     = data.get("last_data",      {})
-        home_lat      = float(data.get("home_lat",      0))
-        home_lon      = float(data.get("home_lon",      0))
-        wind_dir_deg  = float(data.get("wind_dir_deg",  0))
-        wind_speed_ms = float(data.get("wind_speed_ms", 0))
+        dr            = data.get("dead_reckoning", {})
+        fs            = data.get("flight_summary",  {})
+        home_lat      = float(data.get("home_lat",     0))
+        home_lon      = float(data.get("home_lon",     0))
+        wind_dir_deg  = float(data.get("wind_dir_deg", 0))
+        wind_speed_ms = float(data.get("wind_speed_ms",0))
         filename      = data.get("filename", "unknown.csv")
 
         prompt = build_prediction_prompt(
-            last_data, home_lat, home_lon,
+            dr, fs, home_lat, home_lon,
             wind_dir_deg, wind_speed_ms, filename
         )
 
